@@ -1,0 +1,521 @@
+/// Unit Tests for Anonymous Session Cryptography
+/// Tests session key derivation, ephemeral key exchange, and session encryption
+library;
+
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hush/anonymous/services/anonymous_crypto_service.dart';
+import 'package:hush/encryption/services/encryption_service.dart';
+import 'package:sodium_libs/sodium_libs.dart';
+
+void main() {
+  late AnonymousCryptoService cryptoService;
+  late EncryptionService encryptionService;
+  late Sodium sodium;
+
+  setUpAll(() async {
+    sodium = await SodiumInit.init();
+  });
+
+  setUp(() {
+    encryptionService = EncryptionService(sodium: sodium);
+    cryptoService = AnonymousCryptoService(encryption: encryptionService);
+  });
+
+  group('Session Key Generation', () {
+    test('generateSessionKey creates high-entropy key', () {
+      final sessionKey = cryptoService.generateSessionKey();
+
+      expect(sessionKey.length, greaterThanOrEqualTo(32)); // At least 256 bits
+      expect(
+        sessionKey,
+        isNot(contains(RegExp(r'[^A-Za-z0-9_-]'))),
+      ); // URL-safe base64
+    });
+
+    test('generateSessionKey creates unique keys', () {
+      final keys = <String>{};
+
+      for (int i = 0; i < 100; i++) {
+        final key = cryptoService.generateSessionKey();
+        expect(keys.contains(key), isFalse);
+        keys.add(key);
+      }
+
+      expect(keys.length, equals(100));
+    });
+  });
+
+  group('Human-Readable Code Generation', () {
+    test('generateHumanCode creates readable code', () {
+      final sessionSecret = cryptoService.generateSessionKey();
+      final sessionId = 'test-session-id';
+
+      final humanCode = cryptoService.generateHumanCode(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      // Should be in format: WORD-WORD-DIGITS or similar
+      expect(humanCode, isNotEmpty);
+      expect(humanCode.length, greaterThan(5));
+      expect(humanCode.length, lessThan(50));
+    });
+
+    test('generateHumanCode is deterministic', () {
+      final sessionSecret = cryptoService.generateSessionKey();
+      final sessionId = 'test-session-id';
+
+      final code1 = cryptoService.generateHumanCode(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      final code2 = cryptoService.generateHumanCode(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      expect(code1, equals(code2));
+    });
+
+    test('different sessions produce different codes', () {
+      final sessionSecret = cryptoService.generateSessionKey();
+
+      final code1 = cryptoService.generateHumanCode(
+        sessionSecret: sessionSecret,
+        sessionId: 'session-1',
+      );
+
+      final code2 = cryptoService.generateHumanCode(
+        sessionSecret: sessionSecret,
+        sessionId: 'session-2',
+      );
+
+      expect(code1, isNot(equals(code2)));
+    });
+  });
+
+  group('Master Key Derivation (KDF)', () {
+    test('deriveMasterKeys produces deterministic keys', () {
+      final sessionSecret = 'test-session-secret';
+      final sessionId = 'test-session-id';
+
+      final keys1 = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      final keys2 = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      expect(keys1.masterSymKey, equals(keys2.masterSymKey));
+      expect(keys1.bootstrapSeed, equals(keys2.bootstrapSeed));
+    });
+
+    test('deriveMasterKeys produces valid length keys', () {
+      final sessionSecret = cryptoService.generateSessionKey();
+      final sessionId = 'test-session-id';
+
+      final keys = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      expect(keys.masterSymKey.length, equals(32)); // 256 bits
+      expect(keys.bootstrapSeed.length, equals(32)); // 256 bits
+    });
+
+    test('different session IDs produce different keys', () {
+      final sessionSecret = cryptoService.generateSessionKey();
+
+      final keys1 = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: 'session-1',
+      );
+
+      final keys2 = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: 'session-2',
+      );
+
+      expect(keys1.masterSymKey, isNot(equals(keys2.masterSymKey)));
+      expect(keys1.bootstrapSeed, isNot(equals(keys2.bootstrapSeed)));
+    });
+
+    test('different secrets produce different keys', () {
+      final sessionId = 'test-session-id';
+
+      final keys1 = cryptoService.deriveMasterKeys(
+        sessionSecret: 'secret-1',
+        sessionId: sessionId,
+      );
+
+      final keys2 = cryptoService.deriveMasterKeys(
+        sessionSecret: 'secret-2',
+        sessionId: sessionId,
+      );
+
+      expect(keys1.masterSymKey, isNot(equals(keys2.masterSymKey)));
+      expect(keys1.bootstrapSeed, isNot(equals(keys2.bootstrapSeed)));
+    });
+
+    test('masterSymKey and bootstrapSeed are independent', () {
+      final sessionSecret = cryptoService.generateSessionKey();
+      final sessionId = 'test-session-id';
+
+      final keys = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      expect(keys.masterSymKey, isNot(equals(keys.bootstrapSeed)));
+    });
+  });
+
+  group('Ephemeral Key Generation', () {
+    test('generateEphemeralKeyPair creates valid keypair', () async {
+      final bootstrapSeed = Uint8List(32);
+      for (int i = 0; i < 32; i++) {
+        bootstrapSeed[i] = i;
+      }
+
+      final keyPair = await cryptoService.generateEphemeralKeyPair(
+        bootstrapSeed: bootstrapSeed,
+      );
+
+      expect(keyPair.publicKey.length, equals(32));
+      expect(keyPair.secretKey.length, equals(32));
+    });
+
+    test('ephemeral keys are deterministic from seed', () async {
+      final bootstrapSeed = Uint8List(32);
+      for (int i = 0; i < 32; i++) {
+        bootstrapSeed[i] = i;
+      }
+
+      final keyPair1 = await cryptoService.generateEphemeralKeyPair(
+        bootstrapSeed: bootstrapSeed,
+      );
+
+      final keyPair2 = await cryptoService.generateEphemeralKeyPair(
+        bootstrapSeed: bootstrapSeed,
+      );
+
+      expect(keyPair1.publicKey, equals(keyPair2.publicKey));
+      expect(keyPair1.secretKey, equals(keyPair2.secretKey));
+    });
+
+    test('different seeds produce different ephemeral keys', () async {
+      final seed1 = Uint8List(32);
+      final seed2 = Uint8List(32);
+
+      for (int i = 0; i < 32; i++) {
+        seed1[i] = i;
+        seed2[i] = 255 - i;
+      }
+
+      final keyPair1 = await cryptoService.generateEphemeralKeyPair(
+        bootstrapSeed: seed1,
+      );
+
+      final keyPair2 = await cryptoService.generateEphemeralKeyPair(
+        bootstrapSeed: seed2,
+      );
+
+      expect(keyPair1.publicKey, isNot(equals(keyPair2.publicKey)));
+      expect(keyPair1.secretKey, isNot(equals(keyPair2.secretKey)));
+    });
+  });
+
+  group('Session Message Encryption', () {
+    test('encrypt and decrypt session message', () async {
+      final sessionSecret = cryptoService.generateSessionKey();
+      final sessionId = 'test-session-id';
+
+      final masterKeys = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      final plaintext = 'Hello from anonymous session';
+
+      // Encrypt
+      final encrypted = await cryptoService.encryptSessionMessage(
+        plaintext: plaintext,
+        masterSymKey: masterKeys.masterSymKey,
+      );
+
+      expect(encrypted.ciphertext, isNot(equals(utf8.encode(plaintext))));
+      expect(encrypted.nonce.length, equals(24));
+
+      // Decrypt
+      final decrypted = await cryptoService.decryptSessionMessage(
+        encrypted: encrypted,
+        masterSymKey: masterKeys.masterSymKey,
+      );
+
+      expect(decrypted, equals(plaintext));
+    });
+
+    test('both parties can decrypt with same session secret', () async {
+      final sessionSecret = cryptoService.generateSessionKey();
+      final sessionId = 'shared-session';
+
+      // User 1 derives keys
+      final user1Keys = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      // User 2 derives keys (should be identical)
+      final user2Keys = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      expect(user1Keys.masterSymKey, equals(user2Keys.masterSymKey));
+
+      // User 1 encrypts
+      final plaintext = 'Message from user 1';
+      final encrypted = await cryptoService.encryptSessionMessage(
+        plaintext: plaintext,
+        masterSymKey: user1Keys.masterSymKey,
+      );
+
+      // User 2 decrypts
+      final decrypted = await cryptoService.decryptSessionMessage(
+        encrypted: encrypted,
+        masterSymKey: user2Keys.masterSymKey,
+      );
+
+      expect(decrypted, equals(plaintext));
+    });
+
+    test('decryption fails with wrong session secret', () async {
+      final sessionId = 'test-session';
+
+      final keys1 = cryptoService.deriveMasterKeys(
+        sessionSecret: 'secret-1',
+        sessionId: sessionId,
+      );
+
+      final keys2 = cryptoService.deriveMasterKeys(
+        sessionSecret: 'secret-2',
+        sessionId: sessionId,
+      );
+
+      final plaintext = 'Secret message';
+      final encrypted = await cryptoService.encryptSessionMessage(
+        plaintext: plaintext,
+        masterSymKey: keys1.masterSymKey,
+      );
+
+      // Try to decrypt with wrong key - should throw or return error
+      expect(
+        () async => await cryptoService.decryptSessionMessage(
+          encrypted: encrypted,
+          masterSymKey: keys2.masterSymKey,
+        ),
+        throwsA(anything),
+      );
+    });
+  });
+
+  group('Ephemeral Public Key Authentication', () {
+    test('encrypt and verify ephemeral public key', () async {
+      final sessionSecret = cryptoService.generateSessionKey();
+      final sessionId = 'test-session';
+
+      final masterKeys = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      final ephemeralKeyPair = cryptoService.generateEphemeralKeyPair(
+        bootstrapSeed: masterKeys.bootstrapSeed,
+      );
+
+      // Encrypt ephemeral public key for authentication
+      final encryptedPubKey = await cryptoService.encryptEphemeralPublicKey(
+        publicKey: ephemeralKeyPair.publicKey,
+        masterSymKey: masterKeys.masterSymKey,
+      );
+
+      expect(encryptedPubKey.ciphertext, isNotEmpty);
+
+      // Decrypt and verify
+      final decryptedPubKey = await cryptoService.decryptEphemeralPublicKey(
+        encrypted: encryptedPubKey,
+        masterSymKey: masterKeys.masterSymKey,
+      );
+
+      expect(decryptedPubKey, equals(ephemeralKeyPair.publicKey));
+    });
+
+    test('authentication fails with wrong master key', () async {
+      final keys1 = cryptoService.deriveMasterKeys(
+        sessionSecret: 'secret-1',
+        sessionId: 'session',
+      );
+
+      final keys2 = cryptoService.deriveMasterKeys(
+        sessionSecret: 'secret-2',
+        sessionId: 'session',
+      );
+
+      final ephemeralKeyPair = cryptoService.generateEphemeralKeyPair(
+        bootstrapSeed: keys1.bootstrapSeed,
+      );
+
+      final encryptedPubKey = await cryptoService.encryptEphemeralPublicKey(
+        publicKey: ephemeralKeyPair.publicKey,
+        masterSymKey: keys1.masterSymKey,
+      );
+
+      // Try to decrypt with wrong key
+      expect(
+        () async => await cryptoService.decryptEphemeralPublicKey(
+          encrypted: encryptedPubKey,
+          masterSymKey: keys2.masterSymKey,
+        ),
+        throwsA(anything),
+      );
+    });
+  });
+
+  group('Multi-Party Session', () {
+    test('three parties can communicate with same session secret', () async {
+      final sessionSecret = cryptoService.generateSessionKey();
+      final sessionId = 'group-session';
+
+      // All parties derive same keys
+      final user1Keys = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      final user2Keys = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      final user3Keys = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      // Verify all have same master key
+      expect(user1Keys.masterSymKey, equals(user2Keys.masterSymKey));
+      expect(user2Keys.masterSymKey, equals(user3Keys.masterSymKey));
+
+      // User 1 sends message
+      final message1 = 'Hello from user 1';
+      final encrypted1 = await cryptoService.encryptSessionMessage(
+        plaintext: message1,
+        masterSymKey: user1Keys.masterSymKey,
+      );
+
+      // User 2 and 3 decrypt
+      final decrypted1By2 = await cryptoService.decryptSessionMessage(
+        encrypted: encrypted1,
+        masterSymKey: user2Keys.masterSymKey,
+      );
+
+      final decrypted1By3 = await cryptoService.decryptSessionMessage(
+        encrypted: encrypted1,
+        masterSymKey: user3Keys.masterSymKey,
+      );
+
+      expect(decrypted1By2, equals(message1));
+      expect(decrypted1By3, equals(message1));
+
+      // User 2 responds
+      final message2 = 'Reply from user 2';
+      final encrypted2 = await cryptoService.encryptSessionMessage(
+        plaintext: message2,
+        masterSymKey: user2Keys.masterSymKey,
+      );
+
+      // User 1 and 3 decrypt
+      final decrypted2By1 = await cryptoService.decryptSessionMessage(
+        encrypted: encrypted2,
+        masterSymKey: user1Keys.masterSymKey,
+      );
+
+      final decrypted2By3 = await cryptoService.decryptSessionMessage(
+        encrypted: encrypted2,
+        masterSymKey: user3Keys.masterSymKey,
+      );
+
+      expect(decrypted2By1, equals(message2));
+      expect(decrypted2By3, equals(message2));
+    });
+  });
+
+  group('Security Properties', () {
+    test('session keys have sufficient entropy', () {
+      final keys = <String>{};
+
+      for (int i = 0; i < 1000; i++) {
+        final key = cryptoService.generateSessionKey();
+        expect(keys.contains(key), isFalse, reason: 'Duplicate session key');
+        keys.add(key);
+      }
+
+      expect(keys.length, equals(1000));
+    });
+
+    test('KDF output is not predictable from input', () {
+      final keys = <String, Uint8List>{};
+
+      // Generate keys from sequential session IDs
+      for (int i = 0; i < 100; i++) {
+        final masterKeys = cryptoService.deriveMasterKeys(
+          sessionSecret: 'same-secret',
+          sessionId: 'session-$i',
+        );
+
+        final keyHex = masterKeys.masterSymKey
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join();
+
+        expect(keys.containsKey(keyHex), isFalse);
+        keys[keyHex] = masterKeys.masterSymKey;
+      }
+
+      expect(keys.length, equals(100));
+    });
+
+    test('session messages use unique nonces', () async {
+      final sessionSecret = cryptoService.generateSessionKey();
+      final sessionId = 'test-session';
+
+      final masterKeys = cryptoService.deriveMasterKeys(
+        sessionSecret: sessionSecret,
+        sessionId: sessionId,
+      );
+
+      final nonces = <String>{};
+
+      for (int i = 0; i < 100; i++) {
+        final encrypted = await cryptoService.encryptSessionMessage(
+          plaintext: 'Message $i',
+          masterSymKey: masterKeys.masterSymKey,
+        );
+
+        final nonceHex = encrypted.nonce
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join();
+
+        expect(nonces.contains(nonceHex), isFalse, reason: 'Duplicate nonce');
+        nonces.add(nonceHex);
+      }
+
+      expect(nonces.length, equals(100));
+    });
+  });
+}

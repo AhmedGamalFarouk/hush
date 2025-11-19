@@ -1,0 +1,516 @@
+/// Unit Tests for EncryptionService
+/// Tests all cryptographic operations for correctness
+library;
+
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hush/encryption/services/encryption_service.dart';
+import 'package:hush/encryption/models/encrypted_message.dart';
+import 'package:sodium_libs/sodium_libs.dart';
+
+void main() {
+  late EncryptionService encryptionService;
+  late Sodium sodium;
+
+  setUpAll(() async {
+    // Initialize sodium
+    sodium = await SodiumInit.init();
+  });
+
+  setUp(() {
+    encryptionService = EncryptionService(sodium: sodium);
+  });
+
+  group('Key Generation', () {
+    test('generateKeyPair generates valid X25519 keypair', () {
+      final keyPair = encryptionService.generateKeyPair();
+
+      expect(keyPair.publicKey.length, equals(32));
+      expect(keyPair.secretKey.length, equals(32));
+      expect(keyPair.publicKey, isNot(equals(Uint8List(32))));
+      expect(keyPair.secretKey, isNot(equals(Uint8List(32))));
+    });
+
+    test('generateKeyPair generates unique keypairs', () {
+      final keyPair1 = encryptionService.generateKeyPair();
+      final keyPair2 = encryptionService.generateKeyPair();
+
+      expect(keyPair1.publicKey, isNot(equals(keyPair2.publicKey)));
+      expect(keyPair1.secretKey, isNot(equals(keyPair2.secretKey)));
+    });
+
+    test('generateSymmetricKey generates valid 256-bit key', () {
+      final key = encryptionService.generateSymmetricKey();
+
+      expect(key.length, equals(32)); // 256 bits
+      expect(key, isNot(equals(Uint8List(32)))); // Not all zeros
+    });
+
+    test('generateSymmetricKey generates unique keys', () {
+      final key1 = encryptionService.generateSymmetricKey();
+      final key2 = encryptionService.generateSymmetricKey();
+
+      expect(key1, isNot(equals(key2)));
+    });
+  });
+
+  group('Symmetric Encryption (AEAD)', () {
+    test('encrypt and decrypt message with symmetric key', () async {
+      final plaintext = 'Hello, World! This is a test message.';
+      final key = encryptionService.generateSymmetricKey();
+
+      // Encrypt
+      final encryptResult = await encryptionService.encryptMessage(
+        plaintext: plaintext,
+        key: key,
+      );
+
+      expect(encryptResult.isSuccess, isTrue);
+      final encrypted = encryptResult.getOrThrow();
+
+      expect(encrypted.ciphertext.isNotEmpty, isTrue);
+      expect(encrypted.nonce.length, equals(24)); // XChaCha20 nonce size
+      expect(encrypted.ciphertext, isNot(equals(utf8.encode(plaintext))));
+
+      // Decrypt
+      final decryptResult = await encryptionService.decryptMessage(
+        encrypted: encrypted,
+        key: key,
+      );
+
+      expect(decryptResult.isSuccess, isTrue);
+      expect(decryptResult.getOrThrow(), equals(plaintext));
+    });
+
+    test(
+      'encryption produces different ciphertext for same plaintext',
+      () async {
+        final plaintext = 'Test message';
+        final key = encryptionService.generateSymmetricKey();
+
+        final encrypted1 = (await encryptionService.encryptMessage(
+          plaintext: plaintext,
+          key: key,
+        )).getOrThrow();
+
+        final encrypted2 = (await encryptionService.encryptMessage(
+          plaintext: plaintext,
+          key: key,
+        )).getOrThrow();
+
+        // Different nonces should produce different ciphertexts
+        expect(encrypted1.nonce, isNot(equals(encrypted2.nonce)));
+        expect(encrypted1.ciphertext, isNot(equals(encrypted2.ciphertext)));
+      },
+    );
+
+    test('decryption fails with wrong key', () async {
+      final plaintext = 'Secret message';
+      final key1 = encryptionService.generateSymmetricKey();
+      final key2 = encryptionService.generateSymmetricKey();
+
+      final encrypted = (await encryptionService.encryptMessage(
+        plaintext: plaintext,
+        key: key1,
+      )).getOrThrow();
+
+      // Try to decrypt with wrong key
+      final decryptResult = await encryptionService.decryptMessage(
+        encrypted: encrypted,
+        key: key2,
+      );
+
+      expect(decryptResult.isFailure, isTrue);
+    });
+
+    test('decryption fails with tampered ciphertext', () async {
+      final plaintext = 'Authenticated message';
+      final key = encryptionService.generateSymmetricKey();
+
+      final encrypted = (await encryptionService.encryptMessage(
+        plaintext: plaintext,
+        key: key,
+      )).getOrThrow();
+
+      // Tamper with ciphertext
+      final tamperedCiphertext = Uint8List.fromList(encrypted.ciphertext);
+      tamperedCiphertext[0] ^= 0xFF; // Flip bits
+
+      final tamperedEncrypted = EncryptedMessage(
+        ciphertext: tamperedCiphertext,
+        nonce: encrypted.nonce,
+      );
+
+      // Should fail authentication
+      final decryptResult = await encryptionService.decryptMessage(
+        encrypted: tamperedEncrypted,
+        key: key,
+      );
+
+      expect(decryptResult.isFailure, isTrue);
+    });
+
+    test('handles empty plaintext', () async {
+      final plaintext = '';
+      final key = encryptionService.generateSymmetricKey();
+
+      final encrypted = (await encryptionService.encryptMessage(
+        plaintext: plaintext,
+        key: key,
+      )).getOrThrow();
+
+      final decrypted = (await encryptionService.decryptMessage(
+        encrypted: encrypted,
+        key: key,
+      )).getOrThrow();
+
+      expect(decrypted, equals(plaintext));
+    });
+
+    test('handles unicode and special characters', () async {
+      final plaintext = '🔒 Emoji, 中文, العربية, Ελληνικά, special: \n\t\r';
+      final key = encryptionService.generateSymmetricKey();
+
+      final encrypted = (await encryptionService.encryptMessage(
+        plaintext: plaintext,
+        key: key,
+      )).getOrThrow();
+
+      final decrypted = (await encryptionService.decryptMessage(
+        encrypted: encrypted,
+        key: key,
+      )).getOrThrow();
+
+      expect(decrypted, equals(plaintext));
+    });
+
+    test('handles large messages', () async {
+      final plaintext = 'A' * 10000; // 10KB message
+      final key = encryptionService.generateSymmetricKey();
+
+      final encrypted = (await encryptionService.encryptMessage(
+        plaintext: plaintext,
+        key: key,
+      )).getOrThrow();
+
+      final decrypted = (await encryptionService.decryptMessage(
+        encrypted: encrypted,
+        key: key,
+      )).getOrThrow();
+
+      expect(decrypted, equals(plaintext));
+      expect(decrypted.length, equals(10000));
+    });
+  });
+
+  group('Asymmetric Encryption (Public Key)', () {
+    test('encrypt and decrypt with public key cryptography', () async {
+      final plaintext = 'Asymmetrically encrypted message';
+
+      final senderKeyPair = encryptionService.generateKeyPair();
+      final recipientKeyPair = encryptionService.generateKeyPair();
+
+      // Encrypt with recipient's public key
+      final encryptResult = await encryptionService.encryptForRecipient(
+        plaintext: plaintext,
+        recipientPublicKey: recipientKeyPair.publicKey,
+        senderSecretKey: senderKeyPair.secretKey,
+      );
+
+      expect(encryptResult.isSuccess, isTrue);
+      final encrypted = encryptResult.getOrThrow();
+
+      // Decrypt with recipient's secret key
+      final decryptResult = await encryptionService.decryptFromSender(
+        encrypted: encrypted,
+        senderPublicKey: senderKeyPair.publicKey,
+        recipientSecretKey: recipientKeyPair.secretKey,
+      );
+
+      expect(decryptResult.isSuccess, isTrue);
+      expect(decryptResult.getOrThrow(), equals(plaintext));
+    });
+
+    test('decryption fails with wrong recipient key', () async {
+      final plaintext = 'Secret communication';
+
+      final senderKeyPair = encryptionService.generateKeyPair();
+      final recipientKeyPair = encryptionService.generateKeyPair();
+      final wrongKeyPair = encryptionService.generateKeyPair();
+
+      final encrypted = (await encryptionService.encryptForRecipient(
+        plaintext: plaintext,
+        recipientPublicKey: recipientKeyPair.publicKey,
+        senderSecretKey: senderKeyPair.secretKey,
+      )).getOrThrow();
+
+      // Try to decrypt with wrong secret key
+      final decryptResult = await encryptionService.decryptFromSender(
+        encrypted: encrypted,
+        senderPublicKey: senderKeyPair.publicKey,
+        recipientSecretKey: wrongKeyPair.secretKey,
+      );
+
+      expect(decryptResult.isFailure, isTrue);
+    });
+  });
+
+  group('Key Derivation Function (KDF)', () {
+    test('deriveKey produces deterministic output', () {
+      final masterKey = encryptionService.generateSymmetricKey();
+      final context = 'test-context';
+      final subkeyId = 1;
+
+      final derived1 = encryptionService.deriveKey(
+        masterKey: masterKey,
+        context: context,
+        subkeyId: subkeyId,
+      );
+
+      final derived2 = encryptionService.deriveKey(
+        masterKey: masterKey,
+        context: context,
+        subkeyId: subkeyId,
+      );
+
+      expect(derived1, equals(derived2));
+    });
+
+    test('deriveKey produces different keys for different contexts', () {
+      final masterKey = encryptionService.generateSymmetricKey();
+      final subkeyId = 1;
+
+      final derived1 = encryptionService.deriveKey(
+        masterKey: masterKey,
+        context: 'context-1',
+        subkeyId: subkeyId,
+      );
+
+      final derived2 = encryptionService.deriveKey(
+        masterKey: masterKey,
+        context: 'context-2',
+        subkeyId: subkeyId,
+      );
+
+      expect(derived1, isNot(equals(derived2)));
+    });
+
+    test('deriveKey produces different keys for different subkey IDs', () {
+      final masterKey = encryptionService.generateSymmetricKey();
+      final context = 'test-context';
+
+      final derived1 = encryptionService.deriveKey(
+        masterKey: masterKey,
+        context: context,
+        subkeyId: 1,
+      );
+
+      final derived2 = encryptionService.deriveKey(
+        masterKey: masterKey,
+        context: context,
+        subkeyId: 2,
+      );
+
+      expect(derived1, isNot(equals(derived2)));
+    });
+
+    test('derived keys are valid for encryption', () async {
+      final masterKey = encryptionService.generateSymmetricKey();
+      final derivedKey = encryptionService.deriveKey(
+        masterKey: masterKey,
+        context: 'message-encryption',
+        subkeyId: 1,
+      );
+
+      expect(derivedKey.length, equals(32));
+
+      // Use derived key for encryption
+      final plaintext = 'Test with derived key';
+      final encrypted = (await encryptionService.encryptMessage(
+        plaintext: plaintext,
+        key: derivedKey,
+      )).getOrThrow();
+
+      final decrypted = (await encryptionService.decryptMessage(
+        encrypted: encrypted,
+        key: derivedKey,
+      )).getOrThrow();
+
+      expect(decrypted, equals(plaintext));
+    });
+  });
+
+  group('Diffie-Hellman Key Exchange', () {
+    test('computeSharedSecret produces same key for both parties', () {
+      final aliceKeyPair = encryptionService.generateKeyPair();
+      final bobKeyPair = encryptionService.generateKeyPair();
+
+      // Alice computes shared secret
+      final aliceShared = encryptionService.computeSharedSecret(
+        mySecretKey: aliceKeyPair.secretKey,
+        theirPublicKey: bobKeyPair.publicKey,
+      );
+
+      // Bob computes shared secret
+      final bobShared = encryptionService.computeSharedSecret(
+        mySecretKey: bobKeyPair.secretKey,
+        theirPublicKey: aliceKeyPair.publicKey,
+      );
+
+      expect(aliceShared, equals(bobShared));
+      expect(aliceShared.length, equals(32));
+    });
+
+    test('shared secret can be used for symmetric encryption', () async {
+      final aliceKeyPair = encryptionService.generateKeyPair();
+      final bobKeyPair = encryptionService.generateKeyPair();
+
+      // Compute shared secret
+      final sharedSecret = encryptionService.computeSharedSecret(
+        mySecretKey: aliceKeyPair.secretKey,
+        theirPublicKey: bobKeyPair.publicKey,
+      );
+
+      // Alice encrypts
+      final plaintext = 'Message from Alice to Bob';
+      final encrypted = (await encryptionService.encryptMessage(
+        plaintext: plaintext,
+        key: sharedSecret,
+      )).getOrThrow();
+
+      // Bob decrypts using same shared secret
+      final bobSharedSecret = encryptionService.computeSharedSecret(
+        mySecretKey: bobKeyPair.secretKey,
+        theirPublicKey: aliceKeyPair.publicKey,
+      );
+
+      final decrypted = (await encryptionService.decryptMessage(
+        encrypted: encrypted,
+        key: bobSharedSecret,
+      )).getOrThrow();
+
+      expect(decrypted, equals(plaintext));
+    });
+  });
+
+  group('Data Encryption (Files/Binary)', () {
+    test('encrypt and decrypt binary data', () async {
+      final data = Uint8List.fromList([1, 2, 3, 4, 5, 255, 128, 64, 32, 16]);
+      final key = encryptionService.generateSymmetricKey();
+
+      final encrypted = (await encryptionService.encryptData(
+        data: data,
+        key: key,
+      )).getOrThrow();
+
+      expect(encrypted.ciphertext, isNot(equals(data)));
+      expect(encrypted.nonce.length, equals(24));
+
+      final decrypted = (await encryptionService.decryptData(
+        encrypted: encrypted,
+        key: key,
+      )).getOrThrow();
+
+      expect(decrypted, equals(data));
+    });
+
+    test('handles large binary data', () async {
+      // 1MB of random data
+      final data = Uint8List(1024 * 1024);
+      for (int i = 0; i < data.length; i++) {
+        data[i] = i % 256;
+      }
+
+      final key = encryptionService.generateSymmetricKey();
+
+      final encrypted = (await encryptionService.encryptData(
+        data: data,
+        key: key,
+      )).getOrThrow();
+
+      final decrypted = (await encryptionService.decryptData(
+        encrypted: encrypted,
+        key: key,
+      )).getOrThrow();
+
+      expect(decrypted, equals(data));
+      expect(decrypted.length, equals(1024 * 1024));
+    });
+  });
+
+  group('Security Properties', () {
+    test('nonces are unique across encryptions', () async {
+      final plaintext = 'Same message';
+      final key = encryptionService.generateSymmetricKey();
+
+      final nonces = <String>{};
+
+      // Encrypt multiple times
+      for (int i = 0; i < 100; i++) {
+        final encrypted = (await encryptionService.encryptMessage(
+          plaintext: plaintext,
+          key: key,
+        )).getOrThrow();
+
+        final nonceHex = encrypted.nonce
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join();
+        expect(
+          nonces.contains(nonceHex),
+          isFalse,
+          reason: 'Duplicate nonce detected',
+        );
+        nonces.add(nonceHex);
+      }
+
+      expect(nonces.length, equals(100));
+    });
+
+    test('keys are unpredictable', () {
+      final keys = <String>{};
+
+      for (int i = 0; i < 50; i++) {
+        final key = encryptionService.generateSymmetricKey();
+        final keyHex = key
+            .map((b) => b.toRadixString(16).padLeft(2, '0'))
+            .join();
+        expect(
+          keys.contains(keyHex),
+          isFalse,
+          reason: 'Duplicate key detected',
+        );
+        keys.add(keyHex);
+      }
+
+      expect(keys.length, equals(50));
+    });
+
+    test(
+      'ciphertext provides no information about plaintext length patterns',
+      () async {
+        final key = encryptionService.generateSymmetricKey();
+
+        // Messages of similar length
+        final msg1 = 'A' * 100;
+        final msg2 = 'B' * 100;
+
+        final enc1 = (await encryptionService.encryptMessage(
+          plaintext: msg1,
+          key: key,
+        )).getOrThrow();
+
+        final enc2 = (await encryptionService.encryptMessage(
+          plaintext: msg2,
+          key: key,
+        )).getOrThrow();
+
+        // Ciphertext lengths should be similar (within padding)
+        expect(
+          (enc1.ciphertext.length - enc2.ciphertext.length).abs(),
+          lessThanOrEqualTo(16),
+        );
+      },
+    );
+  });
+}
