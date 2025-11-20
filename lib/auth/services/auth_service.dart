@@ -4,15 +4,18 @@ library;
 
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sodium_libs/sodium_libs.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/supabase/supabase_provider.dart';
 import '../../core/utils/result.dart';
+import '../../encryption/providers/encryption_provider.dart';
 import '../../encryption/services/encryption_service.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService(supabase: ref.watch(supabaseProvider));
+  return AuthService(
+    supabase: ref.watch(supabaseProvider),
+    encryptionService: ref.watch(encryptionServiceProvider),
+  );
 });
 
 final authStateProvider = StreamProvider<AuthState>((ref) {
@@ -42,8 +45,13 @@ class _Unauthenticated extends AuthState {
 
 class AuthService {
   final SupabaseClient _supabase;
+  final EncryptionService _encryptionService;
 
-  AuthService({required SupabaseClient supabase}) : _supabase = supabase;
+  AuthService({
+    required SupabaseClient supabase,
+    required EncryptionService encryptionService,
+  }) : _supabase = supabase,
+       _encryptionService = encryptionService;
 
   /// Sign up with email and password
   /// Generates X25519 and Ed25519 keypairs and stores public keys
@@ -54,18 +62,14 @@ class AuthService {
     String? displayName,
   }) async {
     try {
-      // Initialize sodium for key generation
-      final sodium = await SodiumInit.init();
-      final encryptionService = EncryptionService(sodium: sodium);
-
       // Generate key pairs
-      final kxKeyPairResult = await encryptionService.generateKeyPair();
+      final kxKeyPairResult = await _encryptionService.generateKeyPair();
       if (kxKeyPairResult.isFailure) {
         return Result.failure(kxKeyPairResult.errorOrNull!);
       }
       final kxKeyPair = kxKeyPairResult.valueOrNull!;
 
-      final signKeyPairResult = await encryptionService
+      final signKeyPairResult = await _encryptionService
           .generateSigningKeyPair();
       if (signKeyPairResult.isFailure) {
         return Result.failure(signKeyPairResult.errorOrNull!);
@@ -76,6 +80,12 @@ class AuthService {
       final authResponse = await _supabase.auth.signUp(
         email: email,
         password: password,
+        data: {
+          'username': username,
+          'display_name': displayName ?? username,
+          'public_key': base64Url.encode(kxKeyPair.publicKey),
+          'signing_public_key': base64Url.encode(signKeyPair.publicKey),
+        },
       );
 
       if (authResponse.user == null) {
@@ -86,15 +96,22 @@ class AuthService {
 
       final user = authResponse.user!;
 
-      // Create profile with public keys
-      await _supabase.from('profiles').insert({
-        'id': user.id,
-        'email': email,
-        'username': username,
-        'display_name': displayName ?? username,
-        'public_key': base64Url.encode(kxKeyPair.publicKey),
-        'signing_public_key': base64Url.encode(signKeyPair.publicKey),
-      });
+      // Only insert profile if session exists (email confirmation disabled)
+      // If email confirmation is enabled, profile will be created via database trigger
+      if (authResponse.session != null) {
+        try {
+          await _supabase.from('profiles').insert({
+            'id': user.id,
+            'email': email,
+            'username': username,
+            'display_name': displayName ?? username,
+            'public_key': base64Url.encode(kxKeyPair.publicKey),
+            'signing_public_key': base64Url.encode(signKeyPair.publicKey),
+          });
+        } catch (e) {
+          // Profile might already exist from trigger, ignore
+        }
+      }
 
       // TODO: Securely store secret keys (encrypted with user password/PIN)
       // For now, this is a placeholder - production needs secure key storage

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import 'register_screen.dart';
-import '../../chat/presentation/chat_list_screen.dart';
+import '../../presentation/home_screen.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -48,7 +48,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     result.when(
       success: (_) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const ChatListScreen()),
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       },
       failure: (error) {

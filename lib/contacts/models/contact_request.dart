@@ -19,12 +19,12 @@ enum ContactRequestStatus {
 class ContactRequest with _$ContactRequest {
   const factory ContactRequest({
     required String id,
-    required String senderId,
-    required String receiverId,
+    @JsonKey(name: 'sender_id') required String senderId,
+    @JsonKey(name: 'receiver_id') required String receiverId,
     @Default(ContactRequestStatus.pending) ContactRequestStatus status,
     String? message,
-    DateTime? createdAt,
-    DateTime? updatedAt,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
   }) = _ContactRequest;
 
   factory ContactRequest.fromJson(Map<String, dynamic> json) =>

@@ -186,8 +186,9 @@ class __$$NetworkErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$NetworkErrorImpl implements NetworkError {
-  const _$NetworkErrorImpl({this.message = 'Network error occurred'});
+class _$NetworkErrorImpl extends NetworkError {
+  const _$NetworkErrorImpl({this.message = 'Network error occurred'})
+    : super._();
 
   @override
   @JsonKey()
@@ -334,8 +335,9 @@ class _$NetworkErrorImpl implements NetworkError {
   }
 }
 
-abstract class NetworkError implements AppError {
+abstract class NetworkError extends AppError {
   const factory NetworkError({final String message}) = _$NetworkErrorImpl;
+  const NetworkError._() : super._();
 
   @override
   String get message;
@@ -387,8 +389,9 @@ class __$$AuthenticationErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$AuthenticationErrorImpl implements AuthenticationError {
-  const _$AuthenticationErrorImpl({this.message = 'Authentication failed'});
+class _$AuthenticationErrorImpl extends AuthenticationError {
+  const _$AuthenticationErrorImpl({this.message = 'Authentication failed'})
+    : super._();
 
   @override
   @JsonKey()
@@ -538,9 +541,10 @@ class _$AuthenticationErrorImpl implements AuthenticationError {
   }
 }
 
-abstract class AuthenticationError implements AppError {
+abstract class AuthenticationError extends AppError {
   const factory AuthenticationError({final String message}) =
       _$AuthenticationErrorImpl;
+  const AuthenticationError._() : super._();
 
   @override
   String get message;
@@ -592,8 +596,9 @@ class __$$EncryptionErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$EncryptionErrorImpl implements EncryptionError {
-  const _$EncryptionErrorImpl({this.message = 'Encryption operation failed'});
+class _$EncryptionErrorImpl extends EncryptionError {
+  const _$EncryptionErrorImpl({this.message = 'Encryption operation failed'})
+    : super._();
 
   @override
   @JsonKey()
@@ -743,8 +748,9 @@ class _$EncryptionErrorImpl implements EncryptionError {
   }
 }
 
-abstract class EncryptionError implements AppError {
+abstract class EncryptionError extends AppError {
   const factory EncryptionError({final String message}) = _$EncryptionErrorImpl;
+  const EncryptionError._() : super._();
 
   @override
   String get message;
@@ -796,8 +802,9 @@ class __$$DecryptionErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$DecryptionErrorImpl implements DecryptionError {
-  const _$DecryptionErrorImpl({this.message = 'Failed to decrypt message'});
+class _$DecryptionErrorImpl extends DecryptionError {
+  const _$DecryptionErrorImpl({this.message = 'Failed to decrypt message'})
+    : super._();
 
   @override
   @JsonKey()
@@ -947,8 +954,9 @@ class _$DecryptionErrorImpl implements DecryptionError {
   }
 }
 
-abstract class DecryptionError implements AppError {
+abstract class DecryptionError extends AppError {
   const factory DecryptionError({final String message}) = _$DecryptionErrorImpl;
+  const DecryptionError._() : super._();
 
   @override
   String get message;
@@ -1000,8 +1008,9 @@ class __$$InvalidKeyErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$InvalidKeyErrorImpl implements InvalidKeyError {
-  const _$InvalidKeyErrorImpl({this.message = 'Invalid encryption key'});
+class _$InvalidKeyErrorImpl extends InvalidKeyError {
+  const _$InvalidKeyErrorImpl({this.message = 'Invalid encryption key'})
+    : super._();
 
   @override
   @JsonKey()
@@ -1151,8 +1160,9 @@ class _$InvalidKeyErrorImpl implements InvalidKeyError {
   }
 }
 
-abstract class InvalidKeyError implements AppError {
+abstract class InvalidKeyError extends AppError {
   const factory InvalidKeyError({final String message}) = _$InvalidKeyErrorImpl;
+  const InvalidKeyError._() : super._();
 
   @override
   String get message;
@@ -1204,8 +1214,9 @@ class __$$SessionExpiredErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$SessionExpiredErrorImpl implements SessionExpiredError {
-  const _$SessionExpiredErrorImpl({this.message = 'Session has expired'});
+class _$SessionExpiredErrorImpl extends SessionExpiredError {
+  const _$SessionExpiredErrorImpl({this.message = 'Session has expired'})
+    : super._();
 
   @override
   @JsonKey()
@@ -1355,9 +1366,10 @@ class _$SessionExpiredErrorImpl implements SessionExpiredError {
   }
 }
 
-abstract class SessionExpiredError implements AppError {
+abstract class SessionExpiredError extends AppError {
   const factory SessionExpiredError({final String message}) =
       _$SessionExpiredErrorImpl;
+  const SessionExpiredError._() : super._();
 
   @override
   String get message;
@@ -1409,10 +1421,10 @@ class __$$SessionFullErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$SessionFullErrorImpl implements SessionFullError {
+class _$SessionFullErrorImpl extends SessionFullError {
   const _$SessionFullErrorImpl({
     this.message = 'Session has reached maximum participants',
-  });
+  }) : super._();
 
   @override
   @JsonKey()
@@ -1562,9 +1574,10 @@ class _$SessionFullErrorImpl implements SessionFullError {
   }
 }
 
-abstract class SessionFullError implements AppError {
+abstract class SessionFullError extends AppError {
   const factory SessionFullError({final String message}) =
       _$SessionFullErrorImpl;
+  const SessionFullError._() : super._();
 
   @override
   String get message;
@@ -1616,10 +1629,10 @@ class __$$RateLimitedErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$RateLimitedErrorImpl implements RateLimitedError {
+class _$RateLimitedErrorImpl extends RateLimitedError {
   const _$RateLimitedErrorImpl({
     this.message = 'Too many attempts. Please try again later',
-  });
+  }) : super._();
 
   @override
   @JsonKey()
@@ -1769,9 +1782,10 @@ class _$RateLimitedErrorImpl implements RateLimitedError {
   }
 }
 
-abstract class RateLimitedError implements AppError {
+abstract class RateLimitedError extends AppError {
   const factory RateLimitedError({final String message}) =
       _$RateLimitedErrorImpl;
+  const RateLimitedError._() : super._();
 
   @override
   String get message;
@@ -1823,8 +1837,8 @@ class __$$NotFoundErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$NotFoundErrorImpl implements NotFoundError {
-  const _$NotFoundErrorImpl({this.message = 'Resource not found'});
+class _$NotFoundErrorImpl extends NotFoundError {
+  const _$NotFoundErrorImpl({this.message = 'Resource not found'}) : super._();
 
   @override
   @JsonKey()
@@ -1971,8 +1985,9 @@ class _$NotFoundErrorImpl implements NotFoundError {
   }
 }
 
-abstract class NotFoundError implements AppError {
+abstract class NotFoundError extends AppError {
   const factory NotFoundError({final String message}) = _$NotFoundErrorImpl;
+  const NotFoundError._() : super._();
 
   @override
   String get message;
@@ -2024,8 +2039,8 @@ class __$$ValidationErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$ValidationErrorImpl implements ValidationError {
-  const _$ValidationErrorImpl({required this.message});
+class _$ValidationErrorImpl extends ValidationError {
+  const _$ValidationErrorImpl({required this.message}) : super._();
 
   @override
   final String message;
@@ -2174,9 +2189,10 @@ class _$ValidationErrorImpl implements ValidationError {
   }
 }
 
-abstract class ValidationError implements AppError {
+abstract class ValidationError extends AppError {
   const factory ValidationError({required final String message}) =
       _$ValidationErrorImpl;
+  const ValidationError._() : super._();
 
   @override
   String get message;
@@ -2228,8 +2244,9 @@ class __$$UnknownErrorImplCopyWithImpl<$Res>
 
 /// @nodoc
 
-class _$UnknownErrorImpl implements UnknownError {
-  const _$UnknownErrorImpl({this.message = 'An unexpected error occurred'});
+class _$UnknownErrorImpl extends UnknownError {
+  const _$UnknownErrorImpl({this.message = 'An unexpected error occurred'})
+    : super._();
 
   @override
   @JsonKey()
@@ -2376,8 +2393,9 @@ class _$UnknownErrorImpl implements UnknownError {
   }
 }
 
-abstract class UnknownError implements AppError {
+abstract class UnknownError extends AppError {
   const factory UnknownError({final String message}) = _$UnknownErrorImpl;
+  const UnknownError._() : super._();
 
   @override
   String get message;

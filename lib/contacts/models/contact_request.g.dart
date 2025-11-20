@@ -9,30 +9,30 @@ part of 'contact_request.dart';
 _$ContactRequestImpl _$$ContactRequestImplFromJson(Map<String, dynamic> json) =>
     _$ContactRequestImpl(
       id: json['id'] as String,
-      senderId: json['senderId'] as String,
-      receiverId: json['receiverId'] as String,
+      senderId: json['sender_id'] as String,
+      receiverId: json['receiver_id'] as String,
       status:
           $enumDecodeNullable(_$ContactRequestStatusEnumMap, json['status']) ??
           ContactRequestStatus.pending,
       message: json['message'] as String?,
-      createdAt: json['createdAt'] == null
+      createdAt: json['created_at'] == null
           ? null
-          : DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] == null
+          : DateTime.parse(json['created_at'] as String),
+      updatedAt: json['updated_at'] == null
           ? null
-          : DateTime.parse(json['updatedAt'] as String),
+          : DateTime.parse(json['updated_at'] as String),
     );
 
 Map<String, dynamic> _$$ContactRequestImplToJson(
   _$ContactRequestImpl instance,
 ) => <String, dynamic>{
   'id': instance.id,
-  'senderId': instance.senderId,
-  'receiverId': instance.receiverId,
+  'sender_id': instance.senderId,
+  'receiver_id': instance.receiverId,
   'status': _$ContactRequestStatusEnumMap[instance.status]!,
   'message': instance.message,
-  'createdAt': instance.createdAt?.toIso8601String(),
-  'updatedAt': instance.updatedAt?.toIso8601String(),
+  'created_at': instance.createdAt?.toIso8601String(),
+  'updated_at': instance.updatedAt?.toIso8601String(),
 };
 
 const _$ContactRequestStatusEnumMap = {

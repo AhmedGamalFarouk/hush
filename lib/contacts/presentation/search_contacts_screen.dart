@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../chat/models/profile.dart';
 import '../../chat/services/conversation_service.dart';
 import '../../chat/presentation/chat_screen.dart';
+import '../services/contact_service.dart';
 
 class SearchContactsScreen extends ConsumerStatefulWidget {
   const SearchContactsScreen({super.key});
@@ -39,31 +40,23 @@ class _SearchContactsScreenState extends ConsumerState<SearchContactsScreen> {
 
     setState(() => _isSearching = true);
 
-    try {
-      // Search by username or email
-      final supabase = Supabase.instance.client;
-      final response = await supabase
-          .from('profiles')
-          .select()
-          .or('username.ilike.%$query%,email.ilike.%$query%')
-          .limit(20);
+    final contactService = ref.read(contactServiceProvider);
+    final result = await contactService.searchUsers(query);
 
-      final profiles = (response as List)
-          .map((json) => Profile.fromJson(json as Map<String, dynamic>))
-          .toList();
+    if (!mounted) return;
 
-      setState(() {
-        _searchResults = profiles;
-        _isSearching = false;
-      });
-    } catch (e) {
-      setState(() => _isSearching = false);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Search failed: $e')));
+    setState(() {
+      _isSearching = false;
+      if (result.isSuccess) {
+        _searchResults = result.valueOrNull!;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Search failed: ${result.errorOrNull?.message}'),
+          ),
+        );
       }
-    }
+    });
   }
 
   Future<void> _startConversation(Profile profile) async {
@@ -96,9 +89,13 @@ class _SearchContactsScreenState extends ConsumerState<SearchContactsScreen> {
         ),
       );
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to start conversation')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to start conversation: ${result.errorOrNull?.message}',
+          ),
+        ),
+      );
     }
   }
 

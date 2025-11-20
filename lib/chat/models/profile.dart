@@ -13,15 +13,17 @@ class Profile with _$Profile {
     required String id,
     required String email,
     required String username,
-    String? displayName,
+    @JsonKey(name: 'display_name') String? displayName,
     String? bio,
-    String? avatarUrl,
+    @JsonKey(name: 'avatar_url') String? avatarUrl,
+    @JsonKey(name: 'public_key')
     required String publicKey, // X25519 public key (base64url)
+    @JsonKey(name: 'signing_public_key')
     required String signingPublicKey, // Ed25519 public key (base64url)
-    DateTime? lastSeen,
-    @Default(false) bool isOnline,
-    DateTime? createdAt,
-    DateTime? updatedAt,
+    @JsonKey(name: 'last_seen') DateTime? lastSeen,
+    @JsonKey(name: 'is_online') @Default(false) bool isOnline,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
   }) = _Profile;
 
   factory Profile.fromJson(Map<String, dynamic> json) =>

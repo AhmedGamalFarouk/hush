@@ -22,22 +22,27 @@ Message _$MessageFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$Message {
   String get id => throw _privateConstructorUsedError;
+  @JsonKey(name: 'conversation_id')
   String get conversationId => throw _privateConstructorUsedError;
+  @JsonKey(name: 'sender_id')
   String get senderId => throw _privateConstructorUsedError;
   String get ciphertext =>
       throw _privateConstructorUsedError; // Encrypted message content (base64url)
   String get nonce =>
       throw _privateConstructorUsedError; // Encryption nonce (base64url)
-  String? get senderBlob =>
-      throw _privateConstructorUsedError; // Encrypted sender info for anonymous chats
+  @JsonKey(name: 'sender_blob')
+  String? get senderBlob => throw _privateConstructorUsedError; // Encrypted sender info for anonymous chats
   MessageType get type => throw _privateConstructorUsedError;
   MessageStatus get status => throw _privateConstructorUsedError;
   Map<String, dynamic>? get metadata =>
       throw _privateConstructorUsedError; // For media: encrypted URLs, thumbnails, etc.
-  String? get replyToId =>
-      throw _privateConstructorUsedError; // Message ID being replied to
+  @JsonKey(name: 'reply_to_id')
+  String? get replyToId => throw _privateConstructorUsedError; // Message ID being replied to
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'deleted_at')
   DateTime? get deletedAt => throw _privateConstructorUsedError;
 
   /// Serializes this Message to a JSON map.
@@ -56,18 +61,18 @@ abstract class $MessageCopyWith<$Res> {
   @useResult
   $Res call({
     String id,
-    String conversationId,
-    String senderId,
+    @JsonKey(name: 'conversation_id') String conversationId,
+    @JsonKey(name: 'sender_id') String senderId,
     String ciphertext,
     String nonce,
-    String? senderBlob,
+    @JsonKey(name: 'sender_blob') String? senderBlob,
     MessageType type,
     MessageStatus status,
     Map<String, dynamic>? metadata,
-    String? replyToId,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    DateTime? deletedAt,
+    @JsonKey(name: 'reply_to_id') String? replyToId,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
+    @JsonKey(name: 'deleted_at') DateTime? deletedAt,
   });
 }
 
@@ -170,18 +175,18 @@ abstract class _$$MessageImplCopyWith<$Res> implements $MessageCopyWith<$Res> {
   @useResult
   $Res call({
     String id,
-    String conversationId,
-    String senderId,
+    @JsonKey(name: 'conversation_id') String conversationId,
+    @JsonKey(name: 'sender_id') String senderId,
     String ciphertext,
     String nonce,
-    String? senderBlob,
+    @JsonKey(name: 'sender_blob') String? senderBlob,
     MessageType type,
     MessageStatus status,
     Map<String, dynamic>? metadata,
-    String? replyToId,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    DateTime? deletedAt,
+    @JsonKey(name: 'reply_to_id') String? replyToId,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
+    @JsonKey(name: 'deleted_at') DateTime? deletedAt,
   });
 }
 
@@ -277,18 +282,18 @@ class __$$MessageImplCopyWithImpl<$Res>
 class _$MessageImpl implements _Message {
   const _$MessageImpl({
     required this.id,
-    required this.conversationId,
-    required this.senderId,
+    @JsonKey(name: 'conversation_id') required this.conversationId,
+    @JsonKey(name: 'sender_id') required this.senderId,
     required this.ciphertext,
     required this.nonce,
-    this.senderBlob,
+    @JsonKey(name: 'sender_blob') this.senderBlob,
     this.type = MessageType.text,
     this.status = MessageStatus.sending,
     final Map<String, dynamic>? metadata,
-    this.replyToId,
-    this.createdAt,
-    this.updatedAt,
-    this.deletedAt,
+    @JsonKey(name: 'reply_to_id') this.replyToId,
+    @JsonKey(name: 'created_at') this.createdAt,
+    @JsonKey(name: 'updated_at') this.updatedAt,
+    @JsonKey(name: 'deleted_at') this.deletedAt,
   }) : _metadata = metadata;
 
   factory _$MessageImpl.fromJson(Map<String, dynamic> json) =>
@@ -297,8 +302,10 @@ class _$MessageImpl implements _Message {
   @override
   final String id;
   @override
+  @JsonKey(name: 'conversation_id')
   final String conversationId;
   @override
+  @JsonKey(name: 'sender_id')
   final String senderId;
   @override
   final String ciphertext;
@@ -307,6 +314,7 @@ class _$MessageImpl implements _Message {
   final String nonce;
   // Encryption nonce (base64url)
   @override
+  @JsonKey(name: 'sender_blob')
   final String? senderBlob;
   // Encrypted sender info for anonymous chats
   @override
@@ -327,13 +335,17 @@ class _$MessageImpl implements _Message {
 
   // For media: encrypted URLs, thumbnails, etc.
   @override
+  @JsonKey(name: 'reply_to_id')
   final String? replyToId;
   // Message ID being replied to
   @override
+  @JsonKey(name: 'created_at')
   final DateTime? createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
   @override
+  @JsonKey(name: 'deleted_at')
   final DateTime? deletedAt;
 
   @override
@@ -405,18 +417,18 @@ class _$MessageImpl implements _Message {
 abstract class _Message implements Message {
   const factory _Message({
     required final String id,
-    required final String conversationId,
-    required final String senderId,
+    @JsonKey(name: 'conversation_id') required final String conversationId,
+    @JsonKey(name: 'sender_id') required final String senderId,
     required final String ciphertext,
     required final String nonce,
-    final String? senderBlob,
+    @JsonKey(name: 'sender_blob') final String? senderBlob,
     final MessageType type,
     final MessageStatus status,
     final Map<String, dynamic>? metadata,
-    final String? replyToId,
-    final DateTime? createdAt,
-    final DateTime? updatedAt,
-    final DateTime? deletedAt,
+    @JsonKey(name: 'reply_to_id') final String? replyToId,
+    @JsonKey(name: 'created_at') final DateTime? createdAt,
+    @JsonKey(name: 'updated_at') final DateTime? updatedAt,
+    @JsonKey(name: 'deleted_at') final DateTime? deletedAt,
   }) = _$MessageImpl;
 
   factory _Message.fromJson(Map<String, dynamic> json) = _$MessageImpl.fromJson;
@@ -424,14 +436,17 @@ abstract class _Message implements Message {
   @override
   String get id;
   @override
+  @JsonKey(name: 'conversation_id')
   String get conversationId;
   @override
+  @JsonKey(name: 'sender_id')
   String get senderId;
   @override
   String get ciphertext; // Encrypted message content (base64url)
   @override
   String get nonce; // Encryption nonce (base64url)
   @override
+  @JsonKey(name: 'sender_blob')
   String? get senderBlob; // Encrypted sender info for anonymous chats
   @override
   MessageType get type;
@@ -440,12 +455,16 @@ abstract class _Message implements Message {
   @override
   Map<String, dynamic>? get metadata; // For media: encrypted URLs, thumbnails, etc.
   @override
+  @JsonKey(name: 'reply_to_id')
   String? get replyToId; // Message ID being replied to
   @override
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
   @override
+  @JsonKey(name: 'deleted_at')
   DateTime? get deletedAt;
 
   /// Create a copy of Message

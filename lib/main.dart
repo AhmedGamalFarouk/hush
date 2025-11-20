@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sodium_libs/sodium_libs.dart';
 import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
+import 'encryption/providers/encryption_provider.dart';
 import 'presentation/splash/splash_screen.dart';
 
 void main() async {
@@ -30,9 +31,14 @@ void main() async {
   );
 
   // Initialize sodium (libsodium)
-  await SodiumInit.init();
+  final sodium = await SodiumInit.init();
 
-  runApp(const ProviderScope(child: HushApp()));
+  runApp(
+    ProviderScope(
+      overrides: [sodiumProvider.overrideWithValue(sodium)],
+      child: const HushApp(),
+    ),
+  );
 }
 
 class HushApp extends StatelessWidget {

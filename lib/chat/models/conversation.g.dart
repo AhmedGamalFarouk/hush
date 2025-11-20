@@ -12,19 +12,19 @@ _$ConversationImpl _$$ConversationImplFromJson(Map<String, dynamic> json) =>
       type: $enumDecode(_$ConversationTypeEnumMap, json['type']),
       name: json['name'] as String?,
       description: json['description'] as String?,
-      avatarUrl: json['avatarUrl'] as String?,
-      createdAt: json['createdAt'] == null
+      avatarUrl: json['avatar_url'] as String?,
+      createdAt: json['created_at'] == null
           ? null
-          : DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] == null
+          : DateTime.parse(json['created_at'] as String),
+      updatedAt: json['updated_at'] == null
           ? null
-          : DateTime.parse(json['updatedAt'] as String),
-      lastMessageId: json['lastMessageId'] as String?,
-      lastMessagePreview: json['lastMessagePreview'] as String?,
-      lastMessageAt: json['lastMessageAt'] == null
+          : DateTime.parse(json['updated_at'] as String),
+      lastMessageId: json['last_message_id'] as String?,
+      lastMessagePreview: json['last_message_preview'] as String?,
+      lastMessageAt: json['last_message_at'] == null
           ? null
-          : DateTime.parse(json['lastMessageAt'] as String),
-      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
+          : DateTime.parse(json['last_message_at'] as String),
+      unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
 
@@ -34,13 +34,13 @@ Map<String, dynamic> _$$ConversationImplToJson(_$ConversationImpl instance) =>
       'type': _$ConversationTypeEnumMap[instance.type]!,
       'name': instance.name,
       'description': instance.description,
-      'avatarUrl': instance.avatarUrl,
-      'createdAt': instance.createdAt?.toIso8601String(),
-      'updatedAt': instance.updatedAt?.toIso8601String(),
-      'lastMessageId': instance.lastMessageId,
-      'lastMessagePreview': instance.lastMessagePreview,
-      'lastMessageAt': instance.lastMessageAt?.toIso8601String(),
-      'unreadCount': instance.unreadCount,
+      'avatar_url': instance.avatarUrl,
+      'created_at': instance.createdAt?.toIso8601String(),
+      'updated_at': instance.updatedAt?.toIso8601String(),
+      'last_message_id': instance.lastMessageId,
+      'last_message_preview': instance.lastMessagePreview,
+      'last_message_at': instance.lastMessageAt?.toIso8601String(),
+      'unread_count': instance.unreadCount,
       'metadata': instance.metadata,
     };
 
@@ -54,28 +54,28 @@ _$ConversationMemberImpl _$$ConversationMemberImplFromJson(
   Map<String, dynamic> json,
 ) => _$ConversationMemberImpl(
   id: json['id'] as String,
-  conversationId: json['conversationId'] as String,
-  userId: json['userId'] as String,
-  encryptedKey: json['encryptedKey'] as String,
+  conversationId: json['conversation_id'] as String,
+  userId: json['user_id'] as String,
+  encryptedKey: json['encrypted_conversation_key'] as String,
   role: json['role'] as String?,
-  joinedAt: json['joinedAt'] == null
+  joinedAt: json['joined_at'] == null
       ? null
-      : DateTime.parse(json['joinedAt'] as String),
-  lastReadMessageId: json['lastReadMessageId'] as String?,
-  lastReadAt: json['lastReadAt'] == null
+      : DateTime.parse(json['joined_at'] as String),
+  lastReadMessageId: json['last_read_message_id'] as String?,
+  lastReadAt: json['last_read_at'] == null
       ? null
-      : DateTime.parse(json['lastReadAt'] as String),
+      : DateTime.parse(json['last_read_at'] as String),
 );
 
 Map<String, dynamic> _$$ConversationMemberImplToJson(
   _$ConversationMemberImpl instance,
 ) => <String, dynamic>{
   'id': instance.id,
-  'conversationId': instance.conversationId,
-  'userId': instance.userId,
-  'encryptedKey': instance.encryptedKey,
+  'conversation_id': instance.conversationId,
+  'user_id': instance.userId,
+  'encrypted_conversation_key': instance.encryptedKey,
   'role': instance.role,
-  'joinedAt': instance.joinedAt?.toIso8601String(),
-  'lastReadMessageId': instance.lastReadMessageId,
-  'lastReadAt': instance.lastReadAt?.toIso8601String(),
+  'joined_at': instance.joinedAt?.toIso8601String(),
+  'last_read_message_id': instance.lastReadMessageId,
+  'last_read_at': instance.lastReadAt?.toIso8601String(),
 };

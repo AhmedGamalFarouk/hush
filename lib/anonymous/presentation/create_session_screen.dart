@@ -173,135 +173,126 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> {
     }
 
     final session = _createdSession!;
-    final serviceAsync = ref.watch(anonymousSessionServiceProvider);
+    final service = ref.watch(anonymousSessionServiceProvider);
+    final qrData = service.generateQRData(session);
 
-    return serviceAsync.when(
-      data: (service) {
-        final qrData = service.generateQRData(session);
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(AppTheme.spacing16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Card(
-                color: AppTheme.success.withValues(alpha: 0.1),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppTheme.spacing16),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: AppTheme.success),
-                      const SizedBox(width: AppTheme.spacing12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Session Created!',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(color: AppTheme.success),
-                            ),
-                            Text(
-                              'Share the key or QR code',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppTheme.spacing24),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppTheme.spacing24),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Session Code',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppTheme.gray600,
-                        ),
-                      ),
-                      const SizedBox(height: AppTheme.spacing8),
-                      Text(
-                        session.humanCode ?? 'N/A',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 2,
-                            ),
-                      ),
-                      const SizedBox(height: AppTheme.spacing16),
-                      ElevatedButton.icon(
-                        onPressed: () =>
-                            _copyToClipboard(session.humanCode ?? ''),
-                        icon: const Icon(Icons.copy),
-                        label: const Text('Copy Code'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppTheme.spacing16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppTheme.spacing24),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Scan to Join',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppTheme.gray600,
-                        ),
-                      ),
-                      const SizedBox(height: AppTheme.spacing16),
-                      Container(
-                        padding: const EdgeInsets.all(AppTheme.spacing16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusMedium,
-                          ),
-                        ),
-                        child: QrImageView(
-                          data: qrData,
-                          version: QrVersions.auto,
-                          size: 200,
-                          backgroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppTheme.spacing24),
-              Row(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppTheme.spacing16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card(
+            color: AppTheme.success.withValues(alpha: 0.1),
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.spacing16),
+              child: Row(
                 children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _shareSession,
-                      icon: const Icon(Icons.share),
-                      label: const Text('Share'),
-                    ),
-                  ),
+                  const Icon(Icons.check_circle, color: AppTheme.success),
                   const SizedBox(width: AppTheme.spacing12),
                   Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _enterSession,
-                      icon: const Icon(Icons.arrow_forward),
-                      label: const Text('Enter'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Session Created!',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(color: AppTheme.success),
+                        ),
+                        Text(
+                          'Share the key or QR code',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: AppTheme.spacing24),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.spacing24),
+              child: Column(
+                children: [
+                  Text(
+                    'Session Code',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleSmall?.copyWith(color: AppTheme.gray600),
+                  ),
+                  const SizedBox(height: AppTheme.spacing8),
+                  Text(
+                    session.humanCode ?? 'N/A',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.spacing16),
+                  ElevatedButton.icon(
+                    onPressed: () => _copyToClipboard(session.humanCode ?? ''),
+                    icon: const Icon(Icons.copy),
+                    label: const Text('Copy Code'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppTheme.spacing16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.spacing24),
+              child: Column(
+                children: [
+                  Text(
+                    'Scan to Join',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleSmall?.copyWith(color: AppTheme.gray600),
+                  ),
+                  const SizedBox(height: AppTheme.spacing16),
+                  Container(
+                    padding: const EdgeInsets.all(AppTheme.spacing16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(
+                        AppTheme.radiusMedium,
+                      ),
+                    ),
+                    child: QrImageView(
+                      data: qrData,
+                      version: QrVersions.auto,
+                      size: 200,
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppTheme.spacing24),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _shareSession,
+                  icon: const Icon(Icons.share),
+                  label: const Text('Share'),
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacing12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _enterSession,
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('Enter'),
+                ),
+              ),
             ],
           ),
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => Center(child: Text('Error: $error')),
+        ],
+      ),
     );
   }
 
@@ -311,11 +302,7 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> {
     });
 
     try {
-      final serviceValue = ref.read(anonymousSessionServiceProvider);
-      if (!serviceValue.hasValue) {
-        throw Exception('Service not available');
-      }
-      final service = serviceValue.value!;
+      final service = ref.read(anonymousSessionServiceProvider);
 
       final params = CreateSessionParams(
         expiry: _expiry,

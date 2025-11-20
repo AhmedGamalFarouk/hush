@@ -177,11 +177,7 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
     });
 
     try {
-      final serviceValue = ref.read(anonymousSessionServiceProvider);
-      if (!serviceValue.hasValue) {
-        throw Exception('Service not available');
-      }
-      final service = serviceValue.value!;
+      final service = ref.read(anonymousSessionServiceProvider);
 
       final params = JoinSessionParams(
         sessionKey: sessionKey,

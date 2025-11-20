@@ -42,6 +42,10 @@ CREATE POLICY "Public profiles are viewable by everyone"
     ON public.profiles FOR SELECT
     USING (TRUE);
 
+CREATE POLICY "Users can insert their own profile"
+    ON public.profiles FOR INSERT
+    WITH CHECK (auth.uid() = id);
+
 CREATE POLICY "Users can update own profile"
     ON public.profiles FOR UPDATE
     USING (auth.uid() = id);
@@ -63,6 +67,46 @@ CREATE TRIGGER update_profiles_updated_at
     BEFORE UPDATE ON public.profiles
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- AUTO-CREATE PROFILE ON USER SIGNUP
+-- This trigger creates a profile automatically when a new user is created
+-- in auth.users, even when email confirmation is enabled.
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (
+    id,
+    email,
+    username,
+    display_name,
+    public_key,
+    signing_public_key
+  )
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)),
+    NEW.raw_user_meta_data->>'public_key',
+    NEW.raw_user_meta_data->>'signing_public_key'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop existing trigger if it exists
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- Create trigger that runs after user insert
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
 ```
 
 ---
@@ -131,7 +175,7 @@ CREATE TABLE IF NOT EXISTS public.conversation_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     conversation_id UUID REFERENCES public.conversations(id) ON DELETE CASCADE NOT NULL,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    encrypted_key TEXT NOT NULL, -- Conversation key encrypted with user's public key
+    encrypted_conversation_key TEXT NOT NULL, -- Conversation key encrypted with user's public key
     role TEXT DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
     joined_at TIMESTAMPTZ DEFAULT NOW(),
     last_read_message_id UUID,
@@ -152,7 +196,11 @@ CREATE POLICY "Users can view members of their conversations"
         )
     );
 
-CREATE POLICY "Users can add members to their conversations"
+CREATE POLICY "Users can join conversations"
+    ON public.conversation_members FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Members can add other members"
     ON public.conversation_members FOR INSERT
     WITH CHECK (
         conversation_id IN (

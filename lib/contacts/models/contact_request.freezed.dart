@@ -22,11 +22,15 @@ ContactRequest _$ContactRequestFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$ContactRequest {
   String get id => throw _privateConstructorUsedError;
+  @JsonKey(name: 'sender_id')
   String get senderId => throw _privateConstructorUsedError;
+  @JsonKey(name: 'receiver_id')
   String get receiverId => throw _privateConstructorUsedError;
   ContactRequestStatus get status => throw _privateConstructorUsedError;
   String? get message => throw _privateConstructorUsedError;
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
   /// Serializes this ContactRequest to a JSON map.
@@ -48,12 +52,12 @@ abstract class $ContactRequestCopyWith<$Res> {
   @useResult
   $Res call({
     String id,
-    String senderId,
-    String receiverId,
+    @JsonKey(name: 'sender_id') String senderId,
+    @JsonKey(name: 'receiver_id') String receiverId,
     ContactRequestStatus status,
     String? message,
-    DateTime? createdAt,
-    DateTime? updatedAt,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
   });
 }
 
@@ -127,12 +131,12 @@ abstract class _$$ContactRequestImplCopyWith<$Res>
   @useResult
   $Res call({
     String id,
-    String senderId,
-    String receiverId,
+    @JsonKey(name: 'sender_id') String senderId,
+    @JsonKey(name: 'receiver_id') String receiverId,
     ContactRequestStatus status,
     String? message,
-    DateTime? createdAt,
-    DateTime? updatedAt,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
   });
 }
 
@@ -198,12 +202,12 @@ class __$$ContactRequestImplCopyWithImpl<$Res>
 class _$ContactRequestImpl implements _ContactRequest {
   const _$ContactRequestImpl({
     required this.id,
-    required this.senderId,
-    required this.receiverId,
+    @JsonKey(name: 'sender_id') required this.senderId,
+    @JsonKey(name: 'receiver_id') required this.receiverId,
     this.status = ContactRequestStatus.pending,
     this.message,
-    this.createdAt,
-    this.updatedAt,
+    @JsonKey(name: 'created_at') this.createdAt,
+    @JsonKey(name: 'updated_at') this.updatedAt,
   });
 
   factory _$ContactRequestImpl.fromJson(Map<String, dynamic> json) =>
@@ -212,8 +216,10 @@ class _$ContactRequestImpl implements _ContactRequest {
   @override
   final String id;
   @override
+  @JsonKey(name: 'sender_id')
   final String senderId;
   @override
+  @JsonKey(name: 'receiver_id')
   final String receiverId;
   @override
   @JsonKey()
@@ -221,8 +227,10 @@ class _$ContactRequestImpl implements _ContactRequest {
   @override
   final String? message;
   @override
+  @JsonKey(name: 'created_at')
   final DateTime? createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
 
   @override
@@ -281,12 +289,12 @@ class _$ContactRequestImpl implements _ContactRequest {
 abstract class _ContactRequest implements ContactRequest {
   const factory _ContactRequest({
     required final String id,
-    required final String senderId,
-    required final String receiverId,
+    @JsonKey(name: 'sender_id') required final String senderId,
+    @JsonKey(name: 'receiver_id') required final String receiverId,
     final ContactRequestStatus status,
     final String? message,
-    final DateTime? createdAt,
-    final DateTime? updatedAt,
+    @JsonKey(name: 'created_at') final DateTime? createdAt,
+    @JsonKey(name: 'updated_at') final DateTime? updatedAt,
   }) = _$ContactRequestImpl;
 
   factory _ContactRequest.fromJson(Map<String, dynamic> json) =
@@ -295,16 +303,20 @@ abstract class _ContactRequest implements ContactRequest {
   @override
   String get id;
   @override
+  @JsonKey(name: 'sender_id')
   String get senderId;
   @override
+  @JsonKey(name: 'receiver_id')
   String get receiverId;
   @override
   ContactRequestStatus get status;
   @override
   String? get message;
   @override
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
 
   /// Create a copy of ContactRequest

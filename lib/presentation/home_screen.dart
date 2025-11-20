@@ -96,6 +96,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              leading: const Icon(Icons.person_add),
+              title: const Text('New Chat'),
+              subtitle: const Text('Start a chat with a contact'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const SearchContactsScreen(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.group_add),
               title: const Text('New Group'),
               onTap: () {

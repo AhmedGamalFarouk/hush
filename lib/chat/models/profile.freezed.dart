@@ -24,16 +24,22 @@ mixin _$Profile {
   String get id => throw _privateConstructorUsedError;
   String get email => throw _privateConstructorUsedError;
   String get username => throw _privateConstructorUsedError;
+  @JsonKey(name: 'display_name')
   String? get displayName => throw _privateConstructorUsedError;
   String? get bio => throw _privateConstructorUsedError;
+  @JsonKey(name: 'avatar_url')
   String? get avatarUrl => throw _privateConstructorUsedError;
-  String get publicKey =>
-      throw _privateConstructorUsedError; // X25519 public key (base64url)
-  String get signingPublicKey =>
-      throw _privateConstructorUsedError; // Ed25519 public key (base64url)
+  @JsonKey(name: 'public_key')
+  String get publicKey => throw _privateConstructorUsedError; // X25519 public key (base64url)
+  @JsonKey(name: 'signing_public_key')
+  String get signingPublicKey => throw _privateConstructorUsedError; // Ed25519 public key (base64url)
+  @JsonKey(name: 'last_seen')
   DateTime? get lastSeen => throw _privateConstructorUsedError;
+  @JsonKey(name: 'is_online')
   bool get isOnline => throw _privateConstructorUsedError;
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
   /// Serializes this Profile to a JSON map.
@@ -54,15 +60,15 @@ abstract class $ProfileCopyWith<$Res> {
     String id,
     String email,
     String username,
-    String? displayName,
+    @JsonKey(name: 'display_name') String? displayName,
     String? bio,
-    String? avatarUrl,
-    String publicKey,
-    String signingPublicKey,
-    DateTime? lastSeen,
-    bool isOnline,
-    DateTime? createdAt,
-    DateTime? updatedAt,
+    @JsonKey(name: 'avatar_url') String? avatarUrl,
+    @JsonKey(name: 'public_key') String publicKey,
+    @JsonKey(name: 'signing_public_key') String signingPublicKey,
+    @JsonKey(name: 'last_seen') DateTime? lastSeen,
+    @JsonKey(name: 'is_online') bool isOnline,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
   });
 }
 
@@ -162,15 +168,15 @@ abstract class _$$ProfileImplCopyWith<$Res> implements $ProfileCopyWith<$Res> {
     String id,
     String email,
     String username,
-    String? displayName,
+    @JsonKey(name: 'display_name') String? displayName,
     String? bio,
-    String? avatarUrl,
-    String publicKey,
-    String signingPublicKey,
-    DateTime? lastSeen,
-    bool isOnline,
-    DateTime? createdAt,
-    DateTime? updatedAt,
+    @JsonKey(name: 'avatar_url') String? avatarUrl,
+    @JsonKey(name: 'public_key') String publicKey,
+    @JsonKey(name: 'signing_public_key') String signingPublicKey,
+    @JsonKey(name: 'last_seen') DateTime? lastSeen,
+    @JsonKey(name: 'is_online') bool isOnline,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
   });
 }
 
@@ -263,15 +269,15 @@ class _$ProfileImpl implements _Profile {
     required this.id,
     required this.email,
     required this.username,
-    this.displayName,
+    @JsonKey(name: 'display_name') this.displayName,
     this.bio,
-    this.avatarUrl,
-    required this.publicKey,
-    required this.signingPublicKey,
-    this.lastSeen,
-    this.isOnline = false,
-    this.createdAt,
-    this.updatedAt,
+    @JsonKey(name: 'avatar_url') this.avatarUrl,
+    @JsonKey(name: 'public_key') required this.publicKey,
+    @JsonKey(name: 'signing_public_key') required this.signingPublicKey,
+    @JsonKey(name: 'last_seen') this.lastSeen,
+    @JsonKey(name: 'is_online') this.isOnline = false,
+    @JsonKey(name: 'created_at') this.createdAt,
+    @JsonKey(name: 'updated_at') this.updatedAt,
   });
 
   factory _$ProfileImpl.fromJson(Map<String, dynamic> json) =>
@@ -284,25 +290,32 @@ class _$ProfileImpl implements _Profile {
   @override
   final String username;
   @override
+  @JsonKey(name: 'display_name')
   final String? displayName;
   @override
   final String? bio;
   @override
+  @JsonKey(name: 'avatar_url')
   final String? avatarUrl;
   @override
+  @JsonKey(name: 'public_key')
   final String publicKey;
   // X25519 public key (base64url)
   @override
+  @JsonKey(name: 'signing_public_key')
   final String signingPublicKey;
   // Ed25519 public key (base64url)
   @override
+  @JsonKey(name: 'last_seen')
   final DateTime? lastSeen;
   @override
-  @JsonKey()
+  @JsonKey(name: 'is_online')
   final bool isOnline;
   @override
+  @JsonKey(name: 'created_at')
   final DateTime? createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
 
   @override
@@ -375,15 +388,15 @@ abstract class _Profile implements Profile {
     required final String id,
     required final String email,
     required final String username,
-    final String? displayName,
+    @JsonKey(name: 'display_name') final String? displayName,
     final String? bio,
-    final String? avatarUrl,
-    required final String publicKey,
-    required final String signingPublicKey,
-    final DateTime? lastSeen,
-    final bool isOnline,
-    final DateTime? createdAt,
-    final DateTime? updatedAt,
+    @JsonKey(name: 'avatar_url') final String? avatarUrl,
+    @JsonKey(name: 'public_key') required final String publicKey,
+    @JsonKey(name: 'signing_public_key') required final String signingPublicKey,
+    @JsonKey(name: 'last_seen') final DateTime? lastSeen,
+    @JsonKey(name: 'is_online') final bool isOnline,
+    @JsonKey(name: 'created_at') final DateTime? createdAt,
+    @JsonKey(name: 'updated_at') final DateTime? updatedAt,
   }) = _$ProfileImpl;
 
   factory _Profile.fromJson(Map<String, dynamic> json) = _$ProfileImpl.fromJson;
@@ -395,22 +408,30 @@ abstract class _Profile implements Profile {
   @override
   String get username;
   @override
+  @JsonKey(name: 'display_name')
   String? get displayName;
   @override
   String? get bio;
   @override
+  @JsonKey(name: 'avatar_url')
   String? get avatarUrl;
   @override
+  @JsonKey(name: 'public_key')
   String get publicKey; // X25519 public key (base64url)
   @override
+  @JsonKey(name: 'signing_public_key')
   String get signingPublicKey; // Ed25519 public key (base64url)
   @override
+  @JsonKey(name: 'last_seen')
   DateTime? get lastSeen;
   @override
+  @JsonKey(name: 'is_online')
   bool get isOnline;
   @override
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
 
   /// Create a copy of Profile

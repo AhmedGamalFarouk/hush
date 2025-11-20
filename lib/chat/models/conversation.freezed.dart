@@ -25,13 +25,19 @@ mixin _$Conversation {
   ConversationType get type => throw _privateConstructorUsedError;
   String? get name => throw _privateConstructorUsedError; // For groups
   String? get description => throw _privateConstructorUsedError; // For groups
+  @JsonKey(name: 'avatar_url')
   String? get avatarUrl => throw _privateConstructorUsedError; // For groups
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'last_message_id')
   String? get lastMessageId => throw _privateConstructorUsedError;
-  String? get lastMessagePreview =>
-      throw _privateConstructorUsedError; // Encrypted preview
+  @JsonKey(name: 'last_message_preview')
+  String? get lastMessagePreview => throw _privateConstructorUsedError; // Encrypted preview
+  @JsonKey(name: 'last_message_at')
   DateTime? get lastMessageAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'unread_count')
   int get unreadCount => throw _privateConstructorUsedError;
   Map<String, dynamic>? get metadata => throw _privateConstructorUsedError;
 
@@ -57,13 +63,13 @@ abstract class $ConversationCopyWith<$Res> {
     ConversationType type,
     String? name,
     String? description,
-    String? avatarUrl,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    String? lastMessageId,
-    String? lastMessagePreview,
-    DateTime? lastMessageAt,
-    int unreadCount,
+    @JsonKey(name: 'avatar_url') String? avatarUrl,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
+    @JsonKey(name: 'last_message_id') String? lastMessageId,
+    @JsonKey(name: 'last_message_preview') String? lastMessagePreview,
+    @JsonKey(name: 'last_message_at') DateTime? lastMessageAt,
+    @JsonKey(name: 'unread_count') int unreadCount,
     Map<String, dynamic>? metadata,
   });
 }
@@ -166,13 +172,13 @@ abstract class _$$ConversationImplCopyWith<$Res>
     ConversationType type,
     String? name,
     String? description,
-    String? avatarUrl,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    String? lastMessageId,
-    String? lastMessagePreview,
-    DateTime? lastMessageAt,
-    int unreadCount,
+    @JsonKey(name: 'avatar_url') String? avatarUrl,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
+    @JsonKey(name: 'last_message_id') String? lastMessageId,
+    @JsonKey(name: 'last_message_preview') String? lastMessagePreview,
+    @JsonKey(name: 'last_message_at') DateTime? lastMessageAt,
+    @JsonKey(name: 'unread_count') int unreadCount,
     Map<String, dynamic>? metadata,
   });
 }
@@ -267,13 +273,13 @@ class _$ConversationImpl implements _Conversation {
     required this.type,
     this.name,
     this.description,
-    this.avatarUrl,
-    this.createdAt,
-    this.updatedAt,
-    this.lastMessageId,
-    this.lastMessagePreview,
-    this.lastMessageAt,
-    this.unreadCount = 0,
+    @JsonKey(name: 'avatar_url') this.avatarUrl,
+    @JsonKey(name: 'created_at') this.createdAt,
+    @JsonKey(name: 'updated_at') this.updatedAt,
+    @JsonKey(name: 'last_message_id') this.lastMessageId,
+    @JsonKey(name: 'last_message_preview') this.lastMessagePreview,
+    @JsonKey(name: 'last_message_at') this.lastMessageAt,
+    @JsonKey(name: 'unread_count') this.unreadCount = 0,
     final Map<String, dynamic>? metadata,
   }) : _metadata = metadata;
 
@@ -291,21 +297,27 @@ class _$ConversationImpl implements _Conversation {
   final String? description;
   // For groups
   @override
+  @JsonKey(name: 'avatar_url')
   final String? avatarUrl;
   // For groups
   @override
+  @JsonKey(name: 'created_at')
   final DateTime? createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
   @override
+  @JsonKey(name: 'last_message_id')
   final String? lastMessageId;
   @override
+  @JsonKey(name: 'last_message_preview')
   final String? lastMessagePreview;
   // Encrypted preview
   @override
+  @JsonKey(name: 'last_message_at')
   final DateTime? lastMessageAt;
   @override
-  @JsonKey()
+  @JsonKey(name: 'unread_count')
   final int unreadCount;
   final Map<String, dynamic>? _metadata;
   @override
@@ -387,13 +399,13 @@ abstract class _Conversation implements Conversation {
     required final ConversationType type,
     final String? name,
     final String? description,
-    final String? avatarUrl,
-    final DateTime? createdAt,
-    final DateTime? updatedAt,
-    final String? lastMessageId,
-    final String? lastMessagePreview,
-    final DateTime? lastMessageAt,
-    final int unreadCount,
+    @JsonKey(name: 'avatar_url') final String? avatarUrl,
+    @JsonKey(name: 'created_at') final DateTime? createdAt,
+    @JsonKey(name: 'updated_at') final DateTime? updatedAt,
+    @JsonKey(name: 'last_message_id') final String? lastMessageId,
+    @JsonKey(name: 'last_message_preview') final String? lastMessagePreview,
+    @JsonKey(name: 'last_message_at') final DateTime? lastMessageAt,
+    @JsonKey(name: 'unread_count') final int unreadCount,
     final Map<String, dynamic>? metadata,
   }) = _$ConversationImpl;
 
@@ -409,18 +421,25 @@ abstract class _Conversation implements Conversation {
   @override
   String? get description; // For groups
   @override
+  @JsonKey(name: 'avatar_url')
   String? get avatarUrl; // For groups
   @override
+  @JsonKey(name: 'created_at')
   DateTime? get createdAt;
   @override
+  @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
   @override
+  @JsonKey(name: 'last_message_id')
   String? get lastMessageId;
   @override
+  @JsonKey(name: 'last_message_preview')
   String? get lastMessagePreview; // Encrypted preview
   @override
+  @JsonKey(name: 'last_message_at')
   DateTime? get lastMessageAt;
   @override
+  @JsonKey(name: 'unread_count')
   int get unreadCount;
   @override
   Map<String, dynamic>? get metadata;
@@ -440,14 +459,19 @@ ConversationMember _$ConversationMemberFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$ConversationMember {
   String get id => throw _privateConstructorUsedError;
+  @JsonKey(name: 'conversation_id')
   String get conversationId => throw _privateConstructorUsedError;
+  @JsonKey(name: 'user_id')
   String get userId => throw _privateConstructorUsedError;
-  String get encryptedKey =>
-      throw _privateConstructorUsedError; // Conversation key encrypted with user's public key
+  @JsonKey(name: 'encrypted_conversation_key')
+  String get encryptedKey => throw _privateConstructorUsedError; // Conversation key encrypted with user's public key
   String? get role =>
       throw _privateConstructorUsedError; // 'owner', 'admin', 'member'
+  @JsonKey(name: 'joined_at')
   DateTime? get joinedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'last_read_message_id')
   String? get lastReadMessageId => throw _privateConstructorUsedError;
+  @JsonKey(name: 'last_read_at')
   DateTime? get lastReadAt => throw _privateConstructorUsedError;
 
   /// Serializes this ConversationMember to a JSON map.
@@ -469,13 +493,13 @@ abstract class $ConversationMemberCopyWith<$Res> {
   @useResult
   $Res call({
     String id,
-    String conversationId,
-    String userId,
-    String encryptedKey,
+    @JsonKey(name: 'conversation_id') String conversationId,
+    @JsonKey(name: 'user_id') String userId,
+    @JsonKey(name: 'encrypted_conversation_key') String encryptedKey,
     String? role,
-    DateTime? joinedAt,
-    String? lastReadMessageId,
-    DateTime? lastReadAt,
+    @JsonKey(name: 'joined_at') DateTime? joinedAt,
+    @JsonKey(name: 'last_read_message_id') String? lastReadMessageId,
+    @JsonKey(name: 'last_read_at') DateTime? lastReadAt,
   });
 }
 
@@ -554,13 +578,13 @@ abstract class _$$ConversationMemberImplCopyWith<$Res>
   @useResult
   $Res call({
     String id,
-    String conversationId,
-    String userId,
-    String encryptedKey,
+    @JsonKey(name: 'conversation_id') String conversationId,
+    @JsonKey(name: 'user_id') String userId,
+    @JsonKey(name: 'encrypted_conversation_key') String encryptedKey,
     String? role,
-    DateTime? joinedAt,
-    String? lastReadMessageId,
-    DateTime? lastReadAt,
+    @JsonKey(name: 'joined_at') DateTime? joinedAt,
+    @JsonKey(name: 'last_read_message_id') String? lastReadMessageId,
+    @JsonKey(name: 'last_read_at') DateTime? lastReadAt,
   });
 }
 
@@ -631,13 +655,13 @@ class __$$ConversationMemberImplCopyWithImpl<$Res>
 class _$ConversationMemberImpl implements _ConversationMember {
   const _$ConversationMemberImpl({
     required this.id,
-    required this.conversationId,
-    required this.userId,
-    required this.encryptedKey,
+    @JsonKey(name: 'conversation_id') required this.conversationId,
+    @JsonKey(name: 'user_id') required this.userId,
+    @JsonKey(name: 'encrypted_conversation_key') required this.encryptedKey,
     this.role,
-    this.joinedAt,
-    this.lastReadMessageId,
-    this.lastReadAt,
+    @JsonKey(name: 'joined_at') this.joinedAt,
+    @JsonKey(name: 'last_read_message_id') this.lastReadMessageId,
+    @JsonKey(name: 'last_read_at') this.lastReadAt,
   });
 
   factory _$ConversationMemberImpl.fromJson(Map<String, dynamic> json) =>
@@ -646,20 +670,26 @@ class _$ConversationMemberImpl implements _ConversationMember {
   @override
   final String id;
   @override
+  @JsonKey(name: 'conversation_id')
   final String conversationId;
   @override
+  @JsonKey(name: 'user_id')
   final String userId;
   @override
+  @JsonKey(name: 'encrypted_conversation_key')
   final String encryptedKey;
   // Conversation key encrypted with user's public key
   @override
   final String? role;
   // 'owner', 'admin', 'member'
   @override
+  @JsonKey(name: 'joined_at')
   final DateTime? joinedAt;
   @override
+  @JsonKey(name: 'last_read_message_id')
   final String? lastReadMessageId;
   @override
+  @JsonKey(name: 'last_read_at')
   final DateTime? lastReadAt;
 
   @override
@@ -721,13 +751,14 @@ class _$ConversationMemberImpl implements _ConversationMember {
 abstract class _ConversationMember implements ConversationMember {
   const factory _ConversationMember({
     required final String id,
-    required final String conversationId,
-    required final String userId,
+    @JsonKey(name: 'conversation_id') required final String conversationId,
+    @JsonKey(name: 'user_id') required final String userId,
+    @JsonKey(name: 'encrypted_conversation_key')
     required final String encryptedKey,
     final String? role,
-    final DateTime? joinedAt,
-    final String? lastReadMessageId,
-    final DateTime? lastReadAt,
+    @JsonKey(name: 'joined_at') final DateTime? joinedAt,
+    @JsonKey(name: 'last_read_message_id') final String? lastReadMessageId,
+    @JsonKey(name: 'last_read_at') final DateTime? lastReadAt,
   }) = _$ConversationMemberImpl;
 
   factory _ConversationMember.fromJson(Map<String, dynamic> json) =
@@ -736,18 +767,24 @@ abstract class _ConversationMember implements ConversationMember {
   @override
   String get id;
   @override
+  @JsonKey(name: 'conversation_id')
   String get conversationId;
   @override
+  @JsonKey(name: 'user_id')
   String get userId;
   @override
+  @JsonKey(name: 'encrypted_conversation_key')
   String get encryptedKey; // Conversation key encrypted with user's public key
   @override
   String? get role; // 'owner', 'admin', 'member'
   @override
+  @JsonKey(name: 'joined_at')
   DateTime? get joinedAt;
   @override
+  @JsonKey(name: 'last_read_message_id')
   String? get lastReadMessageId;
   @override
+  @JsonKey(name: 'last_read_at')
   DateTime? get lastReadAt;
 
   /// Create a copy of ConversationMember

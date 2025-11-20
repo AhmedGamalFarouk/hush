@@ -39,19 +39,21 @@ enum MessageStatus {
 class Message with _$Message {
   const factory Message({
     required String id,
-    required String conversationId,
-    required String senderId,
+    @JsonKey(name: 'conversation_id') required String conversationId,
+    @JsonKey(name: 'sender_id') required String senderId,
     required String ciphertext, // Encrypted message content (base64url)
     required String nonce, // Encryption nonce (base64url)
+    @JsonKey(name: 'sender_blob')
     String? senderBlob, // Encrypted sender info for anonymous chats
     @Default(MessageType.text) MessageType type,
     @Default(MessageStatus.sending) MessageStatus status,
     Map<String, dynamic>?
     metadata, // For media: encrypted URLs, thumbnails, etc.
+    @JsonKey(name: 'reply_to_id')
     String? replyToId, // Message ID being replied to
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    DateTime? deletedAt,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
+    @JsonKey(name: 'deleted_at') DateTime? deletedAt,
   }) = _Message;
 
   factory Message.fromJson(Map<String, dynamic> json) =>

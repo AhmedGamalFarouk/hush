@@ -8,6 +8,8 @@ part 'app_error.freezed.dart';
 
 @freezed
 class AppError with _$AppError {
+  const AppError._();
+
   const factory AppError.network({
     @Default('Network error occurred') String message,
   }) = NetworkError;
@@ -50,4 +52,19 @@ class AppError with _$AppError {
   const factory AppError.unknown({
     @Default('An unexpected error occurred') String message,
   }) = UnknownError;
+
+  @override
+  String get message => when(
+    network: (m) => m,
+    authentication: (m) => m,
+    encryption: (m) => m,
+    decryption: (m) => m,
+    invalidKey: (m) => m,
+    sessionExpired: (m) => m,
+    sessionFull: (m) => m,
+    rateLimited: (m) => m,
+    notFound: (m) => m,
+    validation: (m) => m,
+    unknown: (m) => m,
+  );
 }

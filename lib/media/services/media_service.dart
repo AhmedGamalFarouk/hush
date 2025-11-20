@@ -23,16 +23,19 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:sodium_libs/sodium_libs.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/supabase/supabase_provider.dart';
 import '../../core/utils/result.dart';
+import '../../encryption/providers/encryption_provider.dart';
 import '../../encryption/services/encryption_service.dart';
 
 /// Provider for media service
 final mediaServiceProvider = Provider<MediaService>((ref) {
-  return MediaService(supabase: ref.watch(supabaseProvider));
+  return MediaService(
+    supabase: ref.watch(supabaseProvider),
+    encryption: ref.watch(encryptionServiceProvider),
+  );
 });
 
 /// Encrypted media metadata
@@ -74,15 +77,14 @@ class EncryptedMedia {
 
 class MediaService {
   final SupabaseClient _supabase;
-  late final EncryptionService _encryption;
+  final EncryptionService _encryption;
   static const String _bucket = 'encrypted-media';
 
-  MediaService({required SupabaseClient supabase}) : _supabase = supabase {
-    // Initialize encryption service
-    SodiumInit.init().then((sodium) {
-      _encryption = EncryptionService(sodium: sodium);
-    });
-  }
+  MediaService({
+    required SupabaseClient supabase,
+    required EncryptionService encryption,
+  }) : _supabase = supabase,
+       _encryption = encryption;
 
   // ============================================================================
   // FILE UPLOAD

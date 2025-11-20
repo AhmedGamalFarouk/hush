@@ -240,9 +240,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       await _loadConversation();
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to send message')));
+        final errorMessage = result.errorOrNull?.message ?? 'Unknown error';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send message: $errorMessage')),
+        );
       }
     }
   }
@@ -272,9 +273,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (uploadResult.isFailure) {
       setState(() => _isSending = false);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to upload media')));
+        final errorMessage =
+            uploadResult.errorOrNull?.message ?? 'Unknown error';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload media: $errorMessage')),
+        );
       }
       return;
     }

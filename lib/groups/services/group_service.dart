@@ -26,29 +26,31 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sodium_libs/sodium_libs.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/supabase/supabase_provider.dart';
 import '../../core/utils/result.dart';
+import '../../encryption/providers/encryption_provider.dart';
 import '../../encryption/services/encryption_service.dart';
 import '../models/group.dart';
 
 /// Provider for group service
 final groupServiceProvider = Provider<GroupService>((ref) {
-  return GroupService(supabase: ref.watch(supabaseProvider));
+  return GroupService(
+    supabase: ref.watch(supabaseProvider),
+    encryption: ref.watch(encryptionServiceProvider),
+  );
 });
 
 class GroupService {
   final SupabaseClient _supabase;
-  late final EncryptionService _encryption;
+  final EncryptionService _encryption;
 
-  GroupService({required SupabaseClient supabase}) : _supabase = supabase {
-    // Initialize encryption service
-    SodiumInit.init().then((sodium) {
-      _encryption = EncryptionService(sodium: sodium);
-    });
-  }
+  GroupService({
+    required SupabaseClient supabase,
+    required EncryptionService encryption,
+  }) : _supabase = supabase,
+       _encryption = encryption;
 
   // ============================================================================
   // GROUP CREATION
@@ -125,7 +127,7 @@ class GroupService {
         memberInserts.add({
           'conversation_id': conversationId,
           'user_id': userId,
-          'encrypted_key': base64Url.encode(encryptedKey),
+          'encrypted_conversation_key': base64Url.encode(encryptedKey),
           'key_version': 1,
           'is_admin': userId == currentUserId,
           'joined_at': now.toIso8601String(),
@@ -383,7 +385,7 @@ class GroupService {
         await _supabase.from('conversation_members').upsert({
           'conversation_id': groupId,
           'user_id': userId,
-          'encrypted_key': base64Url.encode(encryptedKey),
+          'encrypted_conversation_key': base64Url.encode(encryptedKey),
           'key_version': newKeyVersion,
           'joined_at': now.toIso8601String(),
         });

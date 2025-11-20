@@ -4,12 +4,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme/app_theme.dart';
-import '../../auth/services/auth_service.dart';
-import '../../auth/presentation/login_screen.dart';
-import '../../contacts/presentation/search_contacts_screen.dart';
-import '../../qr/presentation/my_qr_screen.dart';
-import '../../qr/presentation/scan_qr_screen.dart';
 import '../../presentation/widgets/empty_state.dart';
 import '../../realtime/services/presence_service.dart';
 import '../models/conversation.dart';
@@ -47,279 +41,42 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     }
   }
 
-  Future<void> _handleSignOut() async {
-    final authService = ref.read(authServiceProvider);
-    await authService.signOut();
-
-    if (!mounted) return;
-
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
-  }
-
   @override
   Widget build(BuildContext context) {
-    final authService = ref.watch(authServiceProvider);
-    final user = authService.currentUser;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hush'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            onPressed: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const ScanQRScreen()));
-            },
-            tooltip: 'Scan QR Code',
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              // Show settings bottom sheet
-              showModalBottomSheet(
-                context: context,
-                builder: (context) => _buildSettingsSheet(context, user),
-              );
-            },
-            tooltip: 'Settings',
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : _conversations.isEmpty
-          ? EmptyState(
-              icon: Icons.chat_bubble_outline,
-              title: 'No conversations yet',
-              subtitle: 'Start a new chat or join an anonymous session',
-            )
-          : RefreshIndicator(
-              onRefresh: _loadConversations,
-              child: ListView.builder(
-                itemCount: _conversations.length,
-                itemBuilder: (context, index) {
-                  final conversation = _conversations[index];
-                  return Consumer(
-                    builder: (context, ref, _) {
-                      return _ConversationTile(
-                        conversation: conversation,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ChatScreen(
-                                conversationId: conversation.id,
-                                conversationName: conversation.name ?? 'Chat',
-                              ),
+    return _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : _conversations.isEmpty
+        ? const EmptyState(
+            icon: Icons.chat_bubble_outline,
+            title: 'No conversations yet',
+            subtitle: 'Start a new chat or join an anonymous session',
+          )
+        : RefreshIndicator(
+            onRefresh: _loadConversations,
+            child: ListView.builder(
+              itemCount: _conversations.length,
+              itemBuilder: (context, index) {
+                final conversation = _conversations[index];
+                return Consumer(
+                  builder: (context, ref, _) {
+                    return _ConversationTile(
+                      conversation: conversation,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              conversationId: conversation.id,
+                              conversationName: conversation.name ?? 'Chat',
                             ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showNewChatOptions(context);
-        },
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  Widget _buildSettingsSheet(BuildContext context, dynamic user) {
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.spacing24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Settings', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppTheme.spacing24),
-
-          // User info
-          if (user != null) ...[
-            ListTile(
-              leading: CircleAvatar(
-                child: Text(user.email?[0].toUpperCase() ?? '?'),
-              ),
-              title: Text(user.email ?? 'Unknown'),
-              subtitle: const Text('Signed in'),
-            ),
-            const Divider(),
-          ],
-
-          // Options
-          ListTile(
-            leading: const Icon(Icons.person_outlined),
-            title: const Text('Profile'),
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Profile - Coming soon')),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.notifications_outlined),
-            title: const Text('Notifications'),
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications - Coming soon')),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.security_outlined),
-            title: const Text('Privacy & Security'),
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Privacy - Coming soon')),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: Icon(
-              Icons.logout,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            title: Text(
-              'Sign Out',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-            onTap: () {
-              Navigator.pop(context);
-              _handleSignOut();
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showNewChatOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(AppTheme.spacing24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('New Chat', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: AppTheme.spacing24),
-
-            ListTile(
-              leading: const Icon(Icons.person_add_outlined),
-              title: const Text('Add Contact'),
-              subtitle: const Text('Find users by username'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => SearchContactsScreen()),
+                          ),
+                        );
+                      },
+                    );
+                  },
                 );
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.qr_code),
-              title: const Text('Share My QR Code'),
-              subtitle: const Text('Let others add you'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(
-                  context,
-                ).push(MaterialPageRoute(builder: (_) => const MyQRScreen()));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.group_add_outlined),
-              title: const Text('Create Group'),
-              subtitle: const Text('Start a group chat'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Create Group - Coming soon')),
-                );
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.lock_clock_outlined),
-              title: const Text('Anonymous Session'),
-              subtitle: const Text('No-account encrypted chat'),
-              onTap: () {
-                Navigator.pop(context);
-                _showAnonymousOptions(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAnonymousOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(AppTheme.spacing24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Anonymous Session',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppTheme.spacing8),
-            Text(
-              'Temporary encrypted chat without accounts',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacing24),
-
-            ListTile(
-              leading: const Icon(Icons.add_circle_outline),
-              title: const Text('Create Session'),
-              subtitle: const Text('Generate a new session key'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Create Anonymous Session - Coming soon'),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.login),
-              title: const Text('Join Session'),
-              subtitle: const Text('Enter session key or scan QR'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Join Anonymous Session - Coming soon'),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+          );
   }
 }
 
@@ -352,25 +109,63 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
     // TODO: Get other user ID and fetch presence
   }
 
+  Color _getAvatarColor(String name) {
+    final colors = [
+      Colors.blue.shade400,
+      Colors.red.shade400,
+      Colors.green.shade400,
+      Colors.orange.shade400,
+      Colors.purple.shade400,
+      Colors.teal.shade400,
+      Colors.pink.shade400,
+      Colors.indigo.shade400,
+    ];
+    return colors[name.hashCode.abs() % colors.length];
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return '?';
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final showPresence =
         widget.conversation.type == ConversationType.direct &&
         _presence != null;
 
+    final name = widget.conversation.name ?? 'Chat';
+    final isAnonymous = widget.conversation.type == ConversationType.anonymous;
+    final isGroup = widget.conversation.type == ConversationType.group;
+
     return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       leading: Stack(
         children: [
           CircleAvatar(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            child: Icon(
-              widget.conversation.type == ConversationType.group
-                  ? Icons.group
-                  : widget.conversation.type == ConversationType.anonymous
-                  ? Icons.lock_clock
-                  : Icons.person,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
+            radius: 24,
+            backgroundColor: isAnonymous
+                ? Colors.grey.shade800
+                : _getAvatarColor(name),
+            child: isAnonymous
+                ? const Icon(
+                    Icons.theater_comedy,
+                    color: Colors.white,
+                    size: 20,
+                  )
+                : isGroup
+                ? const Icon(Icons.group, color: Colors.white, size: 20)
+                : Text(
+                    _getInitials(name),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ),
           // Presence indicator dot
           if (showPresence && _presence!.isOnline)
@@ -392,29 +187,70 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
             ),
         ],
       ),
-      title: Text(
-        widget.conversation.name ?? 'Chat',
-        style: TextStyle(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      title: Row(
         children: [
-          Text(
-            widget.conversation.lastMessagePreview ?? 'No messages yet',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+            ),
           ),
-          if (showPresence && !_presence!.isOnline) ...[
-            SizedBox(height: 2),
-            Text(
-              _presence!.lastSeenText,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 11,
+          if (isAnonymous)
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'ANON',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
+              ),
+            ),
+        ],
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Row(
+          children: [
+            Icon(
+              isAnonymous ? Icons.vpn_key : Icons.lock,
+              size: 12,
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.conversation.lastMessagePreview ?? 'No messages yet',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (showPresence && !_presence!.isOnline) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      _presence!.lastSeenText,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
-        ],
+        ),
       ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -423,15 +259,18 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
           if (widget.conversation.lastMessageAt != null)
             Text(
               _formatTime(widget.conversation.lastMessageAt!),
-              style: Theme.of(context).textTheme.bodySmall,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
           if (widget.conversation.unreadCount > 0) ...[
-            SizedBox(height: 4),
+            const SizedBox(height: 6),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 widget.conversation.unreadCount > 99
@@ -439,8 +278,8 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
                     : widget.conversation.unreadCount.toString(),
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onPrimary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),

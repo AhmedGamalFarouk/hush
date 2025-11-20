@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../auth/services/auth_service.dart';
+import '../../auth/presentation/login_screen.dart';
 import 'edit_profile_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -335,7 +336,13 @@ class SettingsScreen extends ConsumerWidget {
     if (confirmed == true && context.mounted) {
       final authService = ref.read(authServiceProvider);
       await authService.signOut();
-      // Navigation handled by auth state listener
+
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
     }
   }
 }

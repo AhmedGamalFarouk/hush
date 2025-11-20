@@ -23,13 +23,14 @@ class Conversation with _$Conversation {
     required ConversationType type,
     String? name, // For groups
     String? description, // For groups
-    String? avatarUrl, // For groups
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    String? lastMessageId,
+    @JsonKey(name: 'avatar_url') String? avatarUrl, // For groups
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
+    @JsonKey(name: 'last_message_id') String? lastMessageId,
+    @JsonKey(name: 'last_message_preview')
     String? lastMessagePreview, // Encrypted preview
-    DateTime? lastMessageAt,
-    @Default(0) int unreadCount,
+    @JsonKey(name: 'last_message_at') DateTime? lastMessageAt,
+    @JsonKey(name: 'unread_count') @Default(0) int unreadCount,
     Map<String, dynamic>? metadata, // Additional data for anonymous sessions
   }) = _Conversation;
 
@@ -43,14 +44,15 @@ class Conversation with _$Conversation {
 class ConversationMember with _$ConversationMember {
   const factory ConversationMember({
     required String id,
-    required String conversationId,
-    required String userId,
+    @JsonKey(name: 'conversation_id') required String conversationId,
+    @JsonKey(name: 'user_id') required String userId,
+    @JsonKey(name: 'encrypted_conversation_key')
     required String
     encryptedKey, // Conversation key encrypted with user's public key
     String? role, // 'owner', 'admin', 'member'
-    DateTime? joinedAt,
-    String? lastReadMessageId,
-    DateTime? lastReadAt,
+    @JsonKey(name: 'joined_at') DateTime? joinedAt,
+    @JsonKey(name: 'last_read_message_id') String? lastReadMessageId,
+    @JsonKey(name: 'last_read_at') DateTime? lastReadAt,
   }) = _ConversationMember;
 
   factory ConversationMember.fromJson(Map<String, dynamic> json) =>

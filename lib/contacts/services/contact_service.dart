@@ -37,7 +37,8 @@ class ContactService {
   /// Search users by username or display name
   Future<Result<List<Profile>, AppError>> searchUsers(String query) async {
     try {
-      if (query.trim().isEmpty) {
+      final sanitizedQuery = query.trim().replaceAll(',', '');
+      if (sanitizedQuery.isEmpty) {
         return const Result.success([]);
       }
 
@@ -48,16 +49,25 @@ class ContactService {
         );
       }
 
-      // Search by username or display name (case-insensitive)
+      // Search by username, display name, or email (case-insensitive)
       final response = await _supabase
           .from('profiles')
           .select()
-          .or('username.ilike.%$query%,display_name.ilike.%$query%')
+          .or(
+            'username.ilike.%$sanitizedQuery%,display_name.ilike.%$sanitizedQuery%,email.ilike.%$sanitizedQuery%',
+          )
           .neq('id', currentUser.id) // Exclude current user
           .limit(20);
 
       final profiles = (response as List)
-          .map((json) => Profile.fromJson(json as Map<String, dynamic>))
+          .map((json) {
+            try {
+              return Profile.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              return null;
+            }
+          })
+          .whereType<Profile>()
           .toList();
 
       return Result.success(profiles);
@@ -280,7 +290,14 @@ class ContactService {
           .inFilter('id', userIds);
 
       final profiles = (response as List)
-          .map((json) => Profile.fromJson(json as Map<String, dynamic>))
+          .map((json) {
+            try {
+              return Profile.fromJson(json as Map<String, dynamic>);
+            } catch (e) {
+              return null;
+            }
+          })
+          .whereType<Profile>()
           .toList();
 
       return Result.success(profiles);

@@ -37,24 +37,23 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sodium_libs/sodium_libs.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/supabase/supabase_provider.dart';
 import '../../core/utils/result.dart';
+import '../../encryption/providers/encryption_provider.dart';
 import '../../encryption/services/encryption_service.dart';
 import '../models/anonymous_session.dart';
 
 /// Provider for anonymous session service
-final anonymousSessionServiceProvider = FutureProvider<AnonymousSessionService>(
-  (ref) async {
-    final sodium = await SodiumInit.init();
-    return AnonymousSessionService(
-      encryptionService: EncryptionService(sodium: sodium),
-      supabase: ref.watch(supabaseProvider),
-    );
-  },
-);
+final anonymousSessionServiceProvider = Provider<AnonymousSessionService>((
+  ref,
+) {
+  return AnonymousSessionService(
+    encryptionService: ref.watch(encryptionServiceProvider),
+    supabase: ref.watch(supabaseProvider),
+  );
+});
 
 class AnonymousSessionService {
   final EncryptionService _encryption;

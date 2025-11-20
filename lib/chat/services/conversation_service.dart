@@ -5,32 +5,33 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sodium_libs/sodium_libs.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/supabase/supabase_provider.dart';
 import '../../core/utils/result.dart';
+import '../../encryption/providers/encryption_provider.dart';
 import '../../encryption/services/encryption_service.dart';
 import '../models/conversation.dart';
 import '../models/profile.dart';
 
 final conversationServiceProvider = Provider<ConversationService>((ref) {
-  return ConversationService(supabase: ref.watch(supabaseProvider));
+  return ConversationService(
+    supabase: ref.watch(supabaseProvider),
+    encryptionService: ref.watch(encryptionServiceProvider),
+  );
 });
 
 class ConversationService {
   final SupabaseClient _supabase;
   static const _uuid = Uuid();
-  late final EncryptionService _encryptionService;
+  final EncryptionService _encryptionService;
 
-  ConversationService({required SupabaseClient supabase})
-    : _supabase = supabase {
-    // Initialize encryption service
-    SodiumInit.init().then((sodium) {
-      _encryptionService = EncryptionService(sodium: sodium);
-    });
-  }
+  ConversationService({
+    required SupabaseClient supabase,
+    required EncryptionService encryptionService,
+  }) : _supabase = supabase,
+       _encryptionService = encryptionService;
 
   // ===========================================================================
   // CREATE DIRECT CONVERSATION
@@ -55,11 +56,40 @@ class ConversationService {
       }
 
       // Check if conversation already exists
-      // TODO: Implement better check for existing conversations
-      // For now, skip this check and create new conversation
+      // Find conversations where both users are members
+      final myConversations = await _supabase
+          .from('conversation_members')
+          .select('conversation_id')
+          .eq('user_id', currentUser.id);
 
-      // TODO: Fetch other user's public key and implement proper encryption
-      // For now, using simplified key management
+      final myConvIds = (myConversations as List)
+          .map((e) => e['conversation_id'] as String)
+          .toList();
+
+      if (myConvIds.isNotEmpty) {
+        final commonMembers = await _supabase
+            .from('conversation_members')
+            .select('conversation_id')
+            .eq('user_id', otherUserId)
+            .inFilter('conversation_id', myConvIds);
+
+        final commonConvIds = (commonMembers as List)
+            .map((e) => e['conversation_id'] as String)
+            .toList();
+
+        if (commonConvIds.isNotEmpty) {
+          final existingDirectConv = await _supabase
+              .from('conversations')
+              .select()
+              .inFilter('id', commonConvIds)
+              .eq('type', 'direct')
+              .maybeSingle();
+
+          if (existingDirectConv != null) {
+            return getConversation(existingDirectConv['id'] as String);
+          }
+        }
+      }
 
       // Generate conversation key
       final keyResult = await _encryptionService.generateRandomKey(
@@ -80,32 +110,50 @@ class ConversationService {
       final conversationId = _uuid.v4();
       final now = DateTime.now().toUtc();
 
-      await _supabase.from('conversations').insert({
-        'id': conversationId,
-        'type': 'direct',
-        'created_at': now.toIso8601String(),
-        'updated_at': now.toIso8601String(),
-      });
+      try {
+        await _supabase.from('conversations').insert({
+          'id': conversationId,
+          'type': 'direct',
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        });
+        print('Created conversation: $conversationId');
+      } catch (e) {
+        print('Error creating conversation: $e');
+        rethrow;
+      }
 
-      // Add members
-      await _supabase.from('conversation_members').insert([
-        {
+      // Add self first (to satisfy RLS for adding others)
+      try {
+        await _supabase.from('conversation_members').insert({
           'id': _uuid.v4(),
           'conversation_id': conversationId,
           'user_id': currentUser.id,
-          'encrypted_key': encryptedKeyForMe,
+          'encrypted_conversation_key': encryptedKeyForMe,
           'role': 'member',
           'joined_at': now.toIso8601String(),
-        },
-        {
+        });
+        print('Added current user to conversation: ${currentUser.id}');
+      } catch (e) {
+        print('Error adding current user to conversation: $e');
+        rethrow;
+      }
+
+      // Add other user
+      try {
+        await _supabase.from('conversation_members').insert({
           'id': _uuid.v4(),
           'conversation_id': conversationId,
           'user_id': otherUserId,
-          'encrypted_key': encryptedKeyForOther,
+          'encrypted_conversation_key': encryptedKeyForOther,
           'role': 'member',
           'joined_at': now.toIso8601String(),
-        },
-      ]);
+        });
+        print('Added other user to conversation: $otherUserId');
+      } catch (e) {
+        print('Error adding other user to conversation: $e');
+        rethrow;
+      }
 
       final conversation = Conversation(
         id: conversationId,
@@ -163,9 +211,61 @@ class ConversationService {
           .inFilter('id', conversationIds)
           .order('updated_at', ascending: false);
 
-      final conversations = (response as List)
+      var conversations = (response as List)
           .map((json) => Conversation.fromJson(json as Map<String, dynamic>))
           .toList();
+
+      // Populate names for direct conversations
+      final directConvIds = conversations
+          .where((c) => c.type == ConversationType.direct)
+          .map((c) => c.id)
+          .toList();
+
+      if (directConvIds.isNotEmpty) {
+        // Fetch other members for these conversations
+        final otherMembers = await _supabase
+            .from('conversation_members')
+            .select('conversation_id, user_id')
+            .inFilter('conversation_id', directConvIds)
+            .neq('user_id', currentUser.id);
+
+        final userIds = (otherMembers as List)
+            .map((m) => m['user_id'] as String)
+            .toSet() // Unique user IDs
+            .toList();
+
+        if (userIds.isNotEmpty) {
+          final profilesResponse = await _supabase
+              .from('profiles')
+              .select()
+              .inFilter('id', userIds);
+
+          final profiles = (profilesResponse as List).map(
+            (json) => Profile.fromJson(json as Map<String, dynamic>),
+          );
+
+          final profileMap = {for (var p in profiles) p.id: p};
+          final convToUserMap = {
+            for (var m in otherMembers)
+              m['conversation_id'] as String: m['user_id'] as String,
+          };
+
+          conversations = conversations.map((c) {
+            if (c.type == ConversationType.direct) {
+              final otherUserId = convToUserMap[c.id];
+              if (otherUserId != null) {
+                final profile = profileMap[otherUserId];
+                if (profile != null) {
+                  return c.copyWith(
+                    name: profile.displayName ?? profile.username,
+                  );
+                }
+              }
+            }
+            return c;
+          }).toList();
+        }
+      }
 
       return Result.success(conversations);
     } catch (e) {
@@ -199,14 +299,14 @@ class ConversationService {
       // Fetch encrypted key for this user
       final memberData = await _supabase
           .from('conversation_members')
-          .select('encrypted_key')
+          .select('encrypted_conversation_key')
           .eq('conversation_id', conversationId)
           .eq('user_id', currentUser.id)
           .single();
 
       // TODO: Decrypt the key with user's secret key
       // For now, using simplified approach
-      final encryptedKey = memberData['encrypted_key'] as String;
+      final encryptedKey = memberData['encrypted_conversation_key'] as String;
       final conversationKey = base64Url.decode(encryptedKey);
 
       return Result.success(

@@ -5,30 +5,32 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sodium_libs/sodium_libs.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/supabase/supabase_provider.dart';
 import '../../core/utils/result.dart';
+import '../../encryption/providers/encryption_provider.dart';
 import '../../encryption/services/encryption_service.dart';
 import '../models/message.dart';
 
 final messageServiceProvider = Provider<MessageService>((ref) {
-  return MessageService(supabase: ref.watch(supabaseProvider));
+  return MessageService(
+    supabase: ref.watch(supabaseProvider),
+    encryptionService: ref.watch(encryptionServiceProvider),
+  );
 });
 
 class MessageService {
   final SupabaseClient _supabase;
   static const _uuid = Uuid();
-  late final EncryptionService _encryptionService;
+  final EncryptionService _encryptionService;
 
-  MessageService({required SupabaseClient supabase}) : _supabase = supabase {
-    // Initialize encryption service
-    SodiumInit.init().then((sodium) {
-      _encryptionService = EncryptionService(sodium: sodium);
-    });
-  }
+  MessageService({
+    required SupabaseClient supabase,
+    required EncryptionService encryptionService,
+  }) : _supabase = supabase,
+       _encryptionService = encryptionService;
 
   // ===========================================================================
   // SEND MESSAGE
@@ -86,24 +88,44 @@ class MessageService {
       );
 
       // Insert to Supabase
-      await _supabase.from('messages').insert(message.toJson());
+      try {
+        final messageJson = message.toJson();
+        // Remove fields that don't exist in database to avoid column not found errors
+        messageJson.remove('metadata');
+        messageJson.remove('reply_to_id');
+        messageJson.remove('status');
+        await _supabase.from('messages').insert(messageJson);
+      } catch (e) {
+        print('Error inserting message: $e');
+        rethrow;
+      }
 
       // Update conversation's last message
-      await _supabase
-          .from('conversations')
-          .update({
-            'last_message_id': messageId,
-            'last_message_at': now.toIso8601String(),
-            'updated_at': now.toIso8601String(),
-          })
-          .eq('id', conversationId);
+      try {
+        await _supabase
+            .from('conversations')
+            .update({
+              'last_message_id': messageId,
+              'last_message_at': now.toIso8601String(),
+              'updated_at': now.toIso8601String(),
+            })
+            .eq('id', conversationId);
+      } catch (e) {
+        print('Error updating conversation last_message: $e');
+        // Don't rethrow - message was sent successfully
+      }
 
       return Result.success(message.copyWith(status: MessageStatus.sent));
     } on PostgrestException catch (e) {
-      return Result.failure(
-        AppError.unknown(message: 'Database error: ${e.message}'),
+      print(
+        'PostgrestException in sendMessage: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}',
       );
-    } catch (e) {
+      return Result.failure(
+        AppError.unknown(message: 'Database error: ${e.message} (${e.code})'),
+      );
+    } catch (e, stackTrace) {
+      print('Exception in sendMessage: $e');
+      print('Stack trace: $stackTrace');
       return Result.failure(
         AppError.unknown(message: 'Send message failed: $e'),
       );
