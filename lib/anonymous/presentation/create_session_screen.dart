@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_theme.dart';
 import '../models/anonymous_session.dart';
 import '../services/anonymous_session_service.dart';
+import '../providers/session_storage_provider.dart';
 import 'session_lobby_screen.dart';
 
 class CreateSessionScreen extends ConsumerStatefulWidget {
@@ -67,9 +68,11 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> {
                   const SizedBox(height: AppTheme.spacing8),
                   Text(
                     'Create a temporary encrypted chat without account registration.',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: AppTheme.gray600),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                    ),
                   ),
                 ],
               ),
@@ -217,9 +220,9 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> {
                 children: [
                   Text(
                     'Session Code',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleSmall?.copyWith(color: AppTheme.gray600),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
                   ),
                   const SizedBox(height: AppTheme.spacing8),
                   Text(
@@ -247,9 +250,9 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> {
                 children: [
                   Text(
                     'Scan to Join',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleSmall?.copyWith(color: AppTheme.gray600),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
                   ),
                   const SizedBox(height: AppTheme.spacing16),
                   Container(
@@ -316,6 +319,11 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> {
 
       if (result.isSuccess) {
         final (session, localState) = result.valueOrNull!;
+        
+        // Save session to secure storage
+        final storage = ref.read(anonymousSessionStorageProvider);
+        await storage.saveSession(localState);
+        
         setState(() {
           _createdSession = session;
           _localState = localState;
@@ -361,7 +369,10 @@ class _CreateSessionScreenState extends ConsumerState<CreateSessionScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppTheme.gray800),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
     );
   }
 }

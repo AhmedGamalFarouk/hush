@@ -193,7 +193,7 @@ class ConversationService {
       // Get conversation IDs user is part of
       final memberRecords = await _supabase
           .from('conversation_members')
-          .select('conversation_id')
+          .select('conversation_id, encrypted_conversation_key')
           .eq('user_id', currentUser.id);
 
       final conversationIds = (memberRecords as List)
@@ -204,6 +204,12 @@ class ConversationService {
         return const Result.success([]);
       }
 
+      final keyMap = {
+        for (var r in memberRecords)
+          r['conversation_id'] as String:
+              r['encrypted_conversation_key'] as String,
+      };
+
       // Fetch conversations
       final response = await _supabase
           .from('conversations')
@@ -211,9 +217,51 @@ class ConversationService {
           .inFilter('id', conversationIds)
           .order('updated_at', ascending: false);
 
-      var conversations = (response as List)
-          .map((json) => Conversation.fromJson(json as Map<String, dynamic>))
-          .toList();
+      var conversations = await Future.wait(
+        (response as List).map((json) async {
+          var conversation = Conversation.fromJson(
+            json as Map<String, dynamic>,
+          );
+
+          // Decrypt preview if exists
+          if (conversation.lastMessagePreview != null) {
+            try {
+              final encryptedKey = keyMap[conversation.id];
+              if (encryptedKey != null) {
+                // Decrypt conversation key
+                // TODO: This should be decrypted with user's private key.
+                // But current implementation stores it base64 encoded (simplified).
+                final conversationKey = base64Url.decode(encryptedKey);
+
+                final encryptedPreviewJson = jsonDecode(
+                  conversation.lastMessagePreview!,
+                );
+                final encryptedPreview = EncryptedMessage.fromJson(
+                  encryptedPreviewJson,
+                );
+
+                final decryptResult = await _encryptionService.decryptMessage(
+                  encrypted: encryptedPreview,
+                  key: Uint8List.fromList(conversationKey),
+                );
+
+                if (decryptResult.isSuccess) {
+                  conversation = conversation.copyWith(
+                    lastMessagePreview: decryptResult.valueOrNull,
+                  );
+                }
+              }
+            } catch (e) {
+              print('Failed to decrypt preview for ${conversation.id}: $e');
+              // Keep encrypted or set to "Encrypted message"
+              conversation = conversation.copyWith(
+                lastMessagePreview: 'Encrypted message',
+              );
+            }
+          }
+          return conversation;
+        }),
+      );
 
       // Populate names for direct conversations
       final directConvIds = conversations

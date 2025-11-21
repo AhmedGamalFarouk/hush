@@ -2,6 +2,7 @@
 /// Select conversation to forward a message to
 library;
 
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
@@ -10,6 +11,7 @@ import '../models/message.dart';
 import '../services/conversation_service.dart';
 import '../services/message_service.dart';
 import '../../presentation/widgets/empty_state.dart';
+import '../../core/utils/text_direction_helper.dart';
 
 class ForwardMessageScreen extends ConsumerStatefulWidget {
   final DecryptedMessage message;
@@ -159,11 +161,16 @@ class _ForwardMessageScreenState extends ConsumerState<ForwardMessageScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        widget.message.content,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      Directionality(
+                        textDirection: startsWithArabic(widget.message.content)
+                            ? ui.TextDirection.rtl
+                            : ui.TextDirection.ltr,
+                        child: Text(
+                          widget.message.content,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
                       ),
                     ],
                   ),

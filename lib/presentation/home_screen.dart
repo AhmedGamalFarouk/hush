@@ -198,20 +198,26 @@ class ContactsTabScreen extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.contacts, size: 64, color: AppTheme.gray400),
+          Icon(
+            Icons.contacts,
+            size: 64,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: AppTheme.spacing16),
           Text(
             'Contacts',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(color: AppTheme.gray600),
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: Theme.of(context).textTheme.bodyMedium?.color,
+            ),
           ),
           const SizedBox(height: AppTheme.spacing8),
           Text(
             'Your contacts will appear here',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppTheme.gray500),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
           ),
           const SizedBox(height: AppTheme.spacing24),
           ElevatedButton.icon(

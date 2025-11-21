@@ -2,12 +2,14 @@
 /// Shows detailed information about a message
 library;
 
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../models/message.dart';
 import '../services/message_service.dart';
+import '../../core/utils/text_direction_helper.dart';
 
 class MessageInfoScreen extends ConsumerStatefulWidget {
   final DecryptedMessage message;
@@ -135,7 +137,13 @@ class _MessageInfoScreenState extends ConsumerState<MessageInfoScreen> {
                               AppTheme.radiusMedium,
                             ),
                           ),
-                          child: Text(widget.message.content),
+                          child: Directionality(
+                            textDirection:
+                                startsWithArabic(widget.message.content)
+                                ? ui.TextDirection.rtl
+                                : ui.TextDirection.ltr,
+                            child: Text(widget.message.content),
+                          ),
                         ),
                       ],
                     ),

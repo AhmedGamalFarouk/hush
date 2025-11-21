@@ -22,9 +22,12 @@ MessageReaction _$MessageReactionFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$MessageReaction {
   String get id => throw _privateConstructorUsedError;
+  @JsonKey(name: 'message_id')
   String get messageId => throw _privateConstructorUsedError;
+  @JsonKey(name: 'user_id')
   String get userId => throw _privateConstructorUsedError;
   String get emoji => throw _privateConstructorUsedError;
+  @JsonKey(name: 'created_at')
   DateTime get createdAt => throw _privateConstructorUsedError;
 
   /// Serializes this MessageReaction to a JSON map.
@@ -46,10 +49,10 @@ abstract class $MessageReactionCopyWith<$Res> {
   @useResult
   $Res call({
     String id,
-    String messageId,
-    String userId,
+    @JsonKey(name: 'message_id') String messageId,
+    @JsonKey(name: 'user_id') String userId,
     String emoji,
-    DateTime createdAt,
+    @JsonKey(name: 'created_at') DateTime createdAt,
   });
 }
 
@@ -113,10 +116,10 @@ abstract class _$$MessageReactionImplCopyWith<$Res>
   @useResult
   $Res call({
     String id,
-    String messageId,
-    String userId,
+    @JsonKey(name: 'message_id') String messageId,
+    @JsonKey(name: 'user_id') String userId,
     String emoji,
-    DateTime createdAt,
+    @JsonKey(name: 'created_at') DateTime createdAt,
   });
 }
 
@@ -172,10 +175,10 @@ class __$$MessageReactionImplCopyWithImpl<$Res>
 class _$MessageReactionImpl implements _MessageReaction {
   const _$MessageReactionImpl({
     required this.id,
-    required this.messageId,
-    required this.userId,
+    @JsonKey(name: 'message_id') required this.messageId,
+    @JsonKey(name: 'user_id') required this.userId,
     required this.emoji,
-    required this.createdAt,
+    @JsonKey(name: 'created_at') required this.createdAt,
   });
 
   factory _$MessageReactionImpl.fromJson(Map<String, dynamic> json) =>
@@ -184,12 +187,15 @@ class _$MessageReactionImpl implements _MessageReaction {
   @override
   final String id;
   @override
+  @JsonKey(name: 'message_id')
   final String messageId;
   @override
+  @JsonKey(name: 'user_id')
   final String userId;
   @override
   final String emoji;
   @override
+  @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
   @override
@@ -236,10 +242,10 @@ class _$MessageReactionImpl implements _MessageReaction {
 abstract class _MessageReaction implements MessageReaction {
   const factory _MessageReaction({
     required final String id,
-    required final String messageId,
-    required final String userId,
+    @JsonKey(name: 'message_id') required final String messageId,
+    @JsonKey(name: 'user_id') required final String userId,
     required final String emoji,
-    required final DateTime createdAt,
+    @JsonKey(name: 'created_at') required final DateTime createdAt,
   }) = _$MessageReactionImpl;
 
   factory _MessageReaction.fromJson(Map<String, dynamic> json) =
@@ -248,12 +254,15 @@ abstract class _MessageReaction implements MessageReaction {
   @override
   String get id;
   @override
+  @JsonKey(name: 'message_id')
   String get messageId;
   @override
+  @JsonKey(name: 'user_id')
   String get userId;
   @override
   String get emoji;
   @override
+  @JsonKey(name: 'created_at')
   DateTime get createdAt;
 
   /// Create a copy of MessageReaction

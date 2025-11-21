@@ -95,9 +95,11 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
             Center(
               child: Text(
                 _group.description!,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: AppTheme.gray600),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -159,13 +161,15 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: member.isAdmin
                       ? Theme.of(context).colorScheme.primary
-                      : AppTheme.gray600,
+                      : Theme.of(context).textTheme.bodySmall?.color,
                 ),
               ),
               trailing: _isCurrentUserAdmin && !member.isAdmin
                   ? IconButton(
                       icon: const Icon(Icons.remove_circle_outline),
-                      color: AppTheme.gray500,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                       onPressed: () => _removeMember(member.userId),
                     )
                   : null,
@@ -198,13 +202,19 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
       padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing4),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: AppTheme.gray500),
+          Icon(
+            icon,
+            size: 16,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.5),
+          ),
           const SizedBox(width: AppTheme.spacing8),
           Text(
             '$label: ',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppTheme.gray600),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
           ),
           Text(
             value,
@@ -354,7 +364,10 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppTheme.gray800),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
     );
   }
 }

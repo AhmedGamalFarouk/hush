@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import 'register_screen.dart';
 import '../../presentation/home_screen.dart';
 import '../services/auth_service.dart';
+import '../../anonymous/presentation/anonymous_home_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -189,11 +190,55 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     },
                     child: const Text("Don't have an account? Register"),
                   ),
+                  const SizedBox(height: AppTheme.spacing24),
+
+                  // Divider
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppTheme.spacing16,
+                        ),
+                        child: Text(
+                          'OR',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: AppTheme.spacing24),
+
+                  // Guest login button
+                  OutlinedButton.icon(
+                    onPressed: _navigateToGuestMode,
+                    icon: const Icon(Icons.shield_outlined),
+                    label: const Text('Continue as Guest'),
+                  ),
+                  const SizedBox(height: AppTheme.spacing8),
+                  Text(
+                    'Create temporary encrypted sessions without an account',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _navigateToGuestMode() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => const AnonymousHomeScreen(),
       ),
     );
   }

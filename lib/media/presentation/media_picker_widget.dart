@@ -19,7 +19,7 @@ class MediaPickerWidget extends StatelessWidget {
       padding: const EdgeInsets.all(AppTheme.spacing8),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(top: BorderSide(color: AppTheme.gray200)),
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,

@@ -29,10 +29,15 @@ class ReactionService {
     try {
       final currentUser = _supabase.auth.currentUser;
       if (currentUser == null) {
+        print('Cannot add reaction: User not authenticated');
         return Result.failure(
           AppError.authentication(message: 'User not authenticated'),
         );
       }
+
+      print(
+        'Adding reaction $emoji to message $messageId by user ${currentUser.id}',
+      );
 
       // Check if user already reacted with this emoji
       final existing = await _supabase
@@ -44,6 +49,7 @@ class ReactionService {
           .maybeSingle();
 
       if (existing != null) {
+        print('User already reacted with $emoji, toggling off');
         // Already reacted with this emoji, remove it (toggle)
         return removeReaction(messageId: messageId, emoji: emoji);
       }
@@ -57,8 +63,10 @@ class ReactionService {
         'created_at': DateTime.now().toUtc().toIso8601String(),
       });
 
+      print('Reaction added successfully');
       return const Result.success(null);
     } catch (e) {
+      print('Error adding reaction: $e');
       return Result.failure(
         AppError.unknown(message: 'Add reaction failed: $e'),
       );
@@ -154,9 +162,17 @@ class ReactionService {
             value: messageId,
           ),
           callback: (payload) async {
+            print(
+              'Reaction change detected for message $messageId: ${payload.eventType}',
+            );
             final result = await getReactions(messageId: messageId);
             if (result.isSuccess && !controller.isClosed) {
+              print(
+                'Adding ${result.valueOrNull?.length ?? 0} reactions to stream',
+              );
               controller.add(result.valueOrNull ?? []);
+            } else if (result.isFailure) {
+              print('Failed to get reactions: ${result.errorOrNull?.message}');
             }
           },
         )
@@ -165,7 +181,14 @@ class ReactionService {
     // Send initial state
     getReactions(messageId: messageId).then((result) {
       if (result.isSuccess && !controller.isClosed) {
+        print(
+          'Initial reactions loaded: ${result.valueOrNull?.length ?? 0} for message $messageId',
+        );
         controller.add(result.valueOrNull ?? []);
+      } else if (result.isFailure) {
+        print(
+          'Failed to load initial reactions: ${result.errorOrNull?.message}',
+        );
       }
     });
 

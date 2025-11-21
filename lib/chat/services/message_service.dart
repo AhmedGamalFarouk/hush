@@ -68,6 +68,28 @@ class MessageService {
         return Result.failure(encryptResult.errorOrNull!);
       }
 
+      // Create and encrypt preview
+      String previewText = content;
+      if (type == MessageType.image) {
+        previewText = '📷 Image';
+      } else if (type == MessageType.file) {
+        previewText = '📎 File';
+      } else if (content.length > 50) {
+        previewText = '${content.substring(0, 50)}...';
+      }
+
+      final previewEncryptResult = await _encryptionService.encryptMessage(
+        plaintext: previewText,
+        key: conversationKey,
+      );
+
+      String? encryptedPreview;
+      if (previewEncryptResult.isSuccess) {
+        encryptedPreview = jsonEncode(
+          previewEncryptResult.valueOrNull!.toJson(),
+        );
+      }
+
       final encrypted = encryptResult.valueOrNull!;
       final messageId = _uuid.v4();
       final now = DateTime.now().toUtc();
@@ -92,8 +114,8 @@ class MessageService {
         final messageJson = message.toJson();
         // Remove fields that don't exist in database to avoid column not found errors
         messageJson.remove('metadata');
-        messageJson.remove('reply_to_id');
         messageJson.remove('status');
+        // Keep reply_to_id - it exists in the database
         await _supabase.from('messages').insert(messageJson);
       } catch (e) {
         print('Error inserting message: $e');
@@ -102,13 +124,19 @@ class MessageService {
 
       // Update conversation's last message
       try {
+        final updateData = {
+          'last_message_id': messageId,
+          'last_message_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        };
+
+        if (encryptedPreview != null) {
+          updateData['last_message_preview'] = encryptedPreview;
+        }
+
         await _supabase
             .from('conversations')
-            .update({
-              'last_message_id': messageId,
-              'last_message_at': now.toIso8601String(),
-              'updated_at': now.toIso8601String(),
-            })
+            .update(updateData)
             .eq('id', conversationId);
       } catch (e) {
         print('Error updating conversation last_message: $e');
@@ -180,6 +208,35 @@ class MessageService {
     } catch (e) {
       return Result.failure(
         AppError.unknown(message: 'Fetch messages failed: $e'),
+      );
+    }
+  }
+
+  // ===========================================================================
+  // FETCH SINGLE MESSAGE
+  // ===========================================================================
+
+  /// Fetch and decrypt a single message by ID
+  Future<Result<DecryptedMessage, AppError>> getMessage({
+    required String messageId,
+    required Uint8List conversationKey,
+  }) async {
+    try {
+      final response = await _supabase
+          .from('messages')
+          .select()
+          .eq('id', messageId)
+          .single();
+
+      final message = Message.fromJson(response);
+
+      return _decryptMessage(
+        message: message,
+        conversationKey: conversationKey,
+      );
+    } catch (e) {
+      return Result.failure(
+        AppError.unknown(message: 'Get message failed: $e'),
       );
     }
   }

@@ -2,11 +2,13 @@
 /// Search through encrypted messages in a conversation
 library;
 
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../models/message.dart';
+import '../../core/utils/text_direction_helper.dart';
 
 class SearchMessagesScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -215,7 +217,12 @@ class _SearchResultTile extends StatelessWidget {
     final index = lowerContent.indexOf(lowerQuery);
 
     if (index == -1) {
-      return Text(content, maxLines: 2, overflow: TextOverflow.ellipsis);
+      return Directionality(
+        textDirection: startsWithArabic(content)
+            ? ui.TextDirection.rtl
+            : ui.TextDirection.ltr,
+        child: Text(content, maxLines: 2, overflow: TextOverflow.ellipsis),
+      );
     }
 
     // Show context around the match
@@ -226,25 +233,30 @@ class _SearchResultTile extends StatelessWidget {
     final match = content.substring(index, index + searchQuery.length);
     final after = content.substring(index + searchQuery.length, end);
 
-    return RichText(
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-      text: TextSpan(
-        style: Theme.of(context).textTheme.bodySmall,
-        children: [
-          if (start > 0) const TextSpan(text: '...'),
-          TextSpan(text: before),
-          TextSpan(
-            text: match,
-            style: TextStyle(
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
+    return Directionality(
+      textDirection: startsWithArabic(content)
+          ? ui.TextDirection.rtl
+          : ui.TextDirection.ltr,
+      child: RichText(
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        text: TextSpan(
+          style: Theme.of(context).textTheme.bodySmall,
+          children: [
+            if (start > 0) const TextSpan(text: '...'),
+            TextSpan(text: before),
+            TextSpan(
+              text: match,
+              style: TextStyle(
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
             ),
-          ),
-          TextSpan(text: after),
-          if (end < content.length) const TextSpan(text: '...'),
-        ],
+            TextSpan(text: after),
+            if (end < content.length) const TextSpan(text: '...'),
+          ],
+        ),
       ),
     );
   }

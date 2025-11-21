@@ -10,18 +10,18 @@ _$MessageReactionImpl _$$MessageReactionImplFromJson(
   Map<String, dynamic> json,
 ) => _$MessageReactionImpl(
   id: json['id'] as String,
-  messageId: json['messageId'] as String,
-  userId: json['userId'] as String,
+  messageId: json['message_id'] as String,
+  userId: json['user_id'] as String,
   emoji: json['emoji'] as String,
-  createdAt: DateTime.parse(json['createdAt'] as String),
+  createdAt: DateTime.parse(json['created_at'] as String),
 );
 
 Map<String, dynamic> _$$MessageReactionImplToJson(
   _$MessageReactionImpl instance,
 ) => <String, dynamic>{
   'id': instance.id,
-  'messageId': instance.messageId,
-  'userId': instance.userId,
+  'message_id': instance.messageId,
+  'user_id': instance.userId,
   'emoji': instance.emoji,
-  'createdAt': instance.createdAt.toIso8601String(),
+  'created_at': instance.createdAt.toIso8601String(),
 };

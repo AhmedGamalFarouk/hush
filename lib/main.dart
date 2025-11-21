@@ -51,7 +51,9 @@ class HushApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      // Enforce Dark Mode for "Premium Matte & Stealth" aesthetic
+      //TODO: add light/dark mode toggle in settings
+      themeMode: ThemeMode.dark,
       home: const SplashScreen(),
     );
   }

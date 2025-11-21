@@ -2,8 +2,10 @@
 /// One-to-one or group encrypted chat interface
 library;
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -26,6 +28,7 @@ import '../services/reaction_service.dart';
 import 'search_messages_screen.dart';
 import 'forward_message_screen.dart';
 import 'message_info_screen.dart';
+import '../../core/utils/text_direction_helper.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -48,6 +51,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  final _focusNode = FocusNode(); // Add FocusNode
 
   List<DecryptedMessage> _messages = [];
   Uint8List? _conversationKey;
@@ -59,6 +63,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   static const int _messagesPerPage = 50;
   Map<String, List<String>> _readStatus = {}; // messageId -> list of user IDs
   DecryptedMessage? _replyingTo; // Message being replied to
+  ui.TextDirection _inputTextDirection =
+      ui.TextDirection.ltr; // Track input field text direction
 
   @override
   void initState() {
@@ -105,6 +111,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _isTyping = false;
       typingService.stopTyping(widget.conversationId);
     }
+
+    // Update text direction based on content
+    final newDirection = startsWithArabic(text)
+        ? ui.TextDirection.rtl
+        : ui.TextDirection.ltr;
+    if (newDirection != _inputTextDirection) {
+      setState(() {
+        _inputTextDirection = newDirection;
+      });
+    }
   }
 
   @override
@@ -115,6 +131,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
     _messageController.dispose();
     _scrollController.dispose();
+    _focusNode.dispose(); // Dispose FocusNode
     super.dispose();
   }
 
@@ -392,6 +409,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             Supabase.instance.client.auth.currentUser;
                         final isMe = message.senderId == currentUser?.id;
 
+                        // Find replied-to message if available locally
+                        DecryptedMessage? replyToMessage;
+                        if (message.replyToId != null) {
+                          try {
+                            replyToMessage = _messages.firstWhere(
+                              (m) => m.id == message.replyToId,
+                            );
+                          } catch (_) {
+                            // Message not in current list
+                          }
+                        }
+
                         // Show date separator if this is the first message
                         // or if the date changed from previous message
                         bool showDateSeparator = false;
@@ -412,67 +441,128 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           showDateSeparator = currentDate != prevDate;
                         }
 
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (showDateSeparator && message.createdAt != null)
-                              MessageDateSeparator(date: message.createdAt!),
-                            _MessageBubble(
-                              message: message,
-                              isMe: isMe,
-                              readByUserIds: _readStatus[message.id] ?? [],
-                              onLongPress: () {
-                                MessageMenu.show(
-                                  context: context,
-                                  messageContent: message.content,
-                                  isMe: isMe,
-                                  onReply: () {
-                                    setState(() {
-                                      _replyingTo = message;
-                                    });
-                                    // Focus on text field
-                                    FocusScope.of(
-                                      context,
-                                    ).requestFocus(FocusNode());
-                                  },
-                                  onReact: () {
-                                    ReactionPicker.show(
-                                      context: context,
-                                      onReactionSelected: (emoji) async {
-                                        final reactionService = ref.read(
-                                          reactionServiceProvider,
-                                        );
-                                        await reactionService.addReaction(
-                                          messageId: message.id,
-                                          emoji: emoji,
-                                        );
-                                      },
-                                    );
-                                  },
-                                  onForward: () {
-                                    _showForwardDialog(message);
-                                  },
-                                  onInfo: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            MessageInfoScreen(message: message),
-                                      ),
-                                    );
-                                  },
-                                  onDelete: () {
-                                    // TODO: Implement message deletion
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Delete - Coming soon'),
-                                      ),
-                                    );
-                                  },
-                                );
-                              },
+                        return Dismissible(
+                          key: Key('reply_${message.id}'),
+                          direction: DismissDirection.startToEnd,
+                          confirmDismiss: (direction) async {
+                            setState(() {
+                              _replyingTo = message;
+                            });
+                            _focusNode.requestFocus();
+                            return false;
+                          },
+                          background: Container(
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.only(left: 20),
+                            color: Colors.transparent,
+                            child: Icon(
+                              Icons.reply,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
-                          ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (showDateSeparator &&
+                                  message.createdAt != null)
+                                MessageDateSeparator(date: message.createdAt!),
+                              _MessageBubble(
+                                message: message,
+                                replyToMessage: replyToMessage,
+                                isMe: isMe,
+                                readByUserIds: _readStatus[message.id] ?? [],
+                                conversationKey: _conversationKey!,
+                                onLongPress: (BuildContext bubbleContext) {
+                                  // Show quick reactions on long press
+                                  // Get the position of the message bubble
+                                  final RenderBox? box =
+                                      bubbleContext.findRenderObject()
+                                          as RenderBox?;
+                                  final Offset? position = box?.localToGlobal(
+                                    Offset.zero,
+                                  );
+                                  final Size? size = box?.size;
+
+                                  ReactionPicker.showQuick(
+                                    context: context,
+                                    position: position,
+                                    size: size,
+                                    isMe: isMe,
+                                    onReactionSelected: (emoji) async {
+                                      final reactionService = ref.read(
+                                        reactionServiceProvider,
+                                      );
+                                      await reactionService.addReaction(
+                                        messageId: message.id,
+                                        emoji: emoji,
+                                      );
+                                    },
+                                  );
+                                },
+                                onDoubleTap: () {
+                                  // Double tap to like (heart)
+                                  final reactionService = ref.read(
+                                    reactionServiceProvider,
+                                  );
+                                  reactionService.addReaction(
+                                    messageId: message.id,
+                                    emoji: '\u2764\ufe0f',
+                                  );
+                                },
+                                onShowMenu: () {
+                                  MessageMenu.show(
+                                    context: context,
+                                    messageContent: message.content,
+                                    isMe: isMe,
+                                    onReply: () {
+                                      setState(() {
+                                        _replyingTo = message;
+                                      });
+                                      _focusNode.requestFocus();
+                                    },
+                                    onReact: () {
+                                      ReactionPicker.show(
+                                        context: context,
+                                        onReactionSelected: (emoji) async {
+                                          final reactionService = ref.read(
+                                            reactionServiceProvider,
+                                          );
+                                          await reactionService.addReaction(
+                                            messageId: message.id,
+                                            emoji: emoji,
+                                          );
+                                        },
+                                      );
+                                    },
+                                    onForward: () {
+                                      _showForwardDialog(message);
+                                    },
+                                    onInfo: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              MessageInfoScreen(
+                                                message: message,
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                    onDelete: () {
+                                      // TODO: Implement message deletion
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Delete - Coming soon'),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         );
                       },
                     ),
@@ -558,31 +648,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     },
                   ),
                   Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: InputDecoration(
-                        hintText: 'Message',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusLarge,
+                    child: Directionality(
+                      textDirection: _inputTextDirection,
+                      child: TextField(
+                        controller: _messageController,
+                        focusNode: _focusNode, // Attach FocusNode
+                        decoration: InputDecoration(
+                          hintText: 'Message',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusLarge,
+                            ),
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: AppTheme.spacing16,
+                            vertical: AppTheme.spacing12,
                           ),
                         ),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: AppTheme.spacing16,
-                          vertical: AppTheme.spacing12,
-                        ),
+                        maxLines: null,
+                        textInputAction: TextInputAction.send,
+                        onChanged: _onTextChanged,
+                        onSubmitted: (_) {
+                          _sendMessage();
+                          if (_isTyping) {
+                            final typingService = ref.read(
+                              typingServiceProvider,
+                            );
+                            typingService.stopTyping(widget.conversationId);
+                            _isTyping = false;
+                          }
+                        },
                       ),
-                      maxLines: null,
-                      textInputAction: TextInputAction.send,
-                      onChanged: _onTextChanged,
-                      onSubmitted: (_) {
-                        _sendMessage();
-                        if (_isTyping) {
-                          final typingService = ref.read(typingServiceProvider);
-                          typingService.stopTyping(widget.conversationId);
-                          _isTyping = false;
-                        }
-                      },
                     ),
                   ),
                   SizedBox(width: AppTheme.spacing8),
@@ -596,7 +692,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               color: Theme.of(context).colorScheme.onPrimary,
                             ),
                           )
-                        : Icon(Icons.send),
+                        : Icon(
+                            Icons.send,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
                     onPressed: _isSending ? null : _sendMessage,
                   ),
                 ],
@@ -675,15 +774,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
 class _MessageBubble extends ConsumerStatefulWidget {
   final DecryptedMessage message;
+  final DecryptedMessage? replyToMessage;
   final bool isMe;
   final List<String> readByUserIds;
-  final VoidCallback? onLongPress;
+  final void Function(BuildContext)? onLongPress;
+  final VoidCallback? onDoubleTap;
+  final VoidCallback? onShowMenu;
+  final Uint8List conversationKey;
 
   const _MessageBubble({
     required this.message,
+    this.replyToMessage,
     required this.isMe,
     required this.readByUserIds,
     this.onLongPress,
+    this.onDoubleTap,
+    this.onShowMenu,
+    required this.conversationKey,
   });
 
   @override
@@ -692,11 +799,67 @@ class _MessageBubble extends ConsumerStatefulWidget {
 
 class _MessageBubbleState extends ConsumerState<_MessageBubble> {
   List<ReactionSummary> _reactions = [];
+  StreamSubscription? _reactionSubscription;
+  DecryptedMessage? _fetchedReplyMessage;
 
   @override
   void initState() {
     super.initState();
     _loadReactions();
+    _subscribeToReactions();
+    _loadReplyMessageIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(_MessageBubble oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.id != widget.message.id) {
+      _reactionSubscription?.cancel();
+      _loadReactions();
+      _subscribeToReactions();
+    }
+    if (widget.replyToMessage == null &&
+        widget.message.replyToId != null &&
+        _fetchedReplyMessage == null) {
+      _loadReplyMessageIfNeeded();
+    }
+  }
+
+  @override
+  void dispose() {
+    _reactionSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadReplyMessageIfNeeded() async {
+    if (widget.replyToMessage != null || widget.message.replyToId == null) {
+      return;
+    }
+
+    final messageService = ref.read(messageServiceProvider);
+    final result = await messageService.getMessage(
+      messageId: widget.message.replyToId!,
+      conversationKey: widget.conversationKey,
+    );
+
+    if (result.isSuccess && mounted) {
+      setState(() {
+        _fetchedReplyMessage = result.valueOrNull;
+      });
+    }
+  }
+
+  void _subscribeToReactions() {
+    final reactionService = ref.read(reactionServiceProvider);
+    _reactionSubscription = reactionService
+        .subscribeToReactions(widget.message.id)
+        .listen((reactions) {
+          if (mounted) {
+            setState(() {
+              _reactions = reactions;
+            });
+          }
+        });
   }
 
   Future<void> _loadReactions() async {
@@ -706,8 +869,9 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
     );
 
     if (result.isSuccess && mounted) {
+      final reactions = result.valueOrNull ?? [];
       setState(() {
-        _reactions = result.valueOrNull ?? [];
+        _reactions = reactions;
       });
     }
   }
@@ -718,7 +882,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
       messageId: widget.message.id,
       emoji: emoji,
     );
-    _loadReactions();
+    await _loadReactions();
   }
 
   void _showReactionPicker() {
@@ -730,7 +894,7 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
           messageId: widget.message.id,
           emoji: emoji,
         );
-        _loadReactions();
+        await _loadReactions();
       },
     );
   }
@@ -746,155 +910,216 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
     }
 
     // Default text message
-    return Text(
-      message.content,
-      style: TextStyle(
-        color: isMe
-            ? Theme.of(context).colorScheme.onPrimary
-            : Theme.of(context).colorScheme.onSurface,
+    // Determine text direction based on first character
+    final textDir = startsWithArabic(message.content)
+        ? ui.TextDirection.rtl
+        : ui.TextDirection.ltr;
+
+    return Directionality(
+      textDirection: textDir,
+      child: Text(
+        message.content,
+        style: TextStyle(
+          color: isMe
+              ? Theme.of(context).colorScheme.onPrimary
+              : Theme.of(context).colorScheme.onSurface,
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onLongPress: widget.onLongPress,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: AppTheme.spacing8),
-        child: Row(
-          mainAxisAlignment: widget.isMe
-              ? MainAxisAlignment.end
-              : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (!widget.isMe) ...[
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                child: Text(
-                  (widget.message.senderName ?? 'U')[0].toUpperCase(),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+    return Builder(
+      builder: (bubbleContext) => GestureDetector(
+        onLongPress: () {
+          widget.onLongPress?.call(bubbleContext);
+        },
+        onDoubleTap: widget.onDoubleTap,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: AppTheme.spacing8),
+          child: Row(
+            mainAxisAlignment: widget.isMe
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!widget.isMe) ...[
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  child: Text(
+                    (widget.message.senderName ?? 'U')[0].toUpperCase(),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(width: AppTheme.spacing8),
-            ],
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppTheme.spacing16,
-                      vertical: AppTheme.spacing12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: widget.isMe
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-                      border: widget.isMe
-                          ? null
-                          : Border.all(
-                              color: Theme.of(context).dividerColor,
-                              width: 1,
-                            ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (!widget.isMe &&
-                            widget.message.senderName != null) ...[
-                          Text(
-                            widget.message.senderName!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                        ],
-                        // Show replied-to message if exists
-                        if (widget.message.replyToId != null)
-                          _buildReplyPreview(
-                            context,
-                            widget.message.replyToId!,
-                          ),
-                        // Show media or text content
-                        _buildMessageContent(
-                          context,
-                          widget.message,
-                          widget.isMe,
+                SizedBox(width: AppTheme.spacing8),
+              ],
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppTheme.spacing16,
+                        vertical: AppTheme.spacing12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: widget.isMe
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(
+                          AppTheme.radiusLarge,
                         ),
-                        SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
+                        border: widget.isMe
+                            ? null
+                            : Border.all(
+                                color: Theme.of(context).dividerColor,
+                                width: 1,
+                              ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (!widget.isMe &&
+                              widget.message.senderName != null) ...[
                             Text(
-                              _formatTime(widget.message.createdAt),
+                              widget.message.senderName!,
                               style: TextStyle(
-                                fontSize: 11,
-                                color: widget.isMe
-                                    ? Theme.of(context).colorScheme.onPrimary
-                                          .withValues(alpha: 0.7)
-                                    : Theme.of(context).colorScheme.onSurface
-                                          .withValues(alpha: 0.5),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                             ),
-                            if (widget.isMe) ...[
-                              SizedBox(width: 4),
-                              _buildReadStatusIcon(context),
-                            ],
+                            SizedBox(height: 4),
                           ],
-                        ),
-                      ],
+                          // Show replied-to message if exists
+                          if (widget.message.replyToId != null)
+                            _buildReplyPreview(
+                              context,
+                              widget.message.replyToId!,
+                            ),
+                          // Show media or text content
+                          _buildMessageContent(
+                            context,
+                            widget.message,
+                            widget.isMe,
+                          ),
+                          SizedBox(height: 4),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _formatTime(widget.message.createdAt),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: widget.isMe
+                                      ? Theme.of(context).colorScheme.onPrimary
+                                            .withValues(alpha: 0.7)
+                                      : Theme.of(context).colorScheme.onSurface
+                                            .withValues(alpha: 0.5),
+                                ),
+                              ),
+                              if (widget.isMe) ...[
+                                SizedBox(width: 4),
+                                _buildReadStatusIcon(context),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  // Reactions display
-                  if (_reactions.isNotEmpty)
+                    // Reactions display - ALWAYS show (with + button)
                     MessageReactions(
                       reactions: _reactions,
                       onReactionTap: _handleReactionTap,
                       onAddReaction: _showReactionPicker,
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (widget.isMe) SizedBox(width: AppTheme.spacing48),
-          ],
+              if (widget.isMe) SizedBox(width: AppTheme.spacing48),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildReplyPreview(BuildContext context, String replyToId) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 8),
-      padding: EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: widget.isMe
-            ? Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.1)
-            : Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(
-            color: Theme.of(context).colorScheme.primary,
-            width: 3,
+    final replyMessage = widget.replyToMessage ?? _fetchedReplyMessage;
+    final hasContent = replyMessage != null;
+    final senderName = hasContent
+        ? (replyMessage.senderName ?? 'Unknown')
+        : 'Loading...';
+
+    String content = 'Message not found';
+    if (hasContent) {
+      if (replyMessage.type == MessageType.text) {
+        content = replyMessage.content;
+      } else {
+        content = '[${replyMessage.type.name.toUpperCase()}]';
+      }
+    }
+
+    return GestureDetector(
+      onTap: () {
+        // TODO: Scroll to message
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+          border: Border(
+            left: BorderSide(
+              color: widget.isMe
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.primary,
+              width: 3,
+            ),
           ),
         ),
-      ),
-      child: Text(
-        'Replied to a message',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: widget.isMe
-              ? Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)
-              : Theme.of(context).colorScheme.onSurfaceVariant,
-          fontStyle: FontStyle.italic,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              senderName,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: widget.isMe
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Directionality(
+              textDirection: startsWithArabic(content)
+                  ? ui.TextDirection.rtl
+                  : ui.TextDirection.ltr,
+              child: Text(
+                content,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: widget.isMe
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.onPrimary.withValues(alpha: 0.8)
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.8),
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

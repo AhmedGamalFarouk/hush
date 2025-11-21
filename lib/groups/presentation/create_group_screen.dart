@@ -172,19 +172,29 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                         Icon(
                           Icons.people_outline,
                           size: 64,
-                          color: AppTheme.gray400,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.4),
                         ),
                         const SizedBox(height: AppTheme.spacing16),
                         Text(
                           'No contacts yet',
                           style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(color: AppTheme.gray600),
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.7),
+                              ),
                         ),
                         const SizedBox(height: AppTheme.spacing8),
                         Text(
                           'Add contacts to create groups',
                           style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: AppTheme.gray500),
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.5),
+                              ),
                         ),
                       ],
                     ),
@@ -264,7 +274,10 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppTheme.gray800),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
     );
   }
 }

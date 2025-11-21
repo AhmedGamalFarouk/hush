@@ -86,9 +86,9 @@ class SettingsScreen extends ConsumerWidget {
           ),
           child: Text(
             'App Settings',
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(color: AppTheme.gray600),
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: Theme.of(context).textTheme.bodyMedium?.color,
+            ),
           ),
         ),
         ListTile(
@@ -126,9 +126,9 @@ class SettingsScreen extends ConsumerWidget {
           ),
           child: Text(
             'Security & Privacy',
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(color: AppTheme.gray600),
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: Theme.of(context).textTheme.bodyMedium?.color,
+            ),
           ),
         ),
         ListTile(
@@ -173,9 +173,9 @@ class SettingsScreen extends ConsumerWidget {
           ),
           child: Text(
             'About',
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(color: AppTheme.gray600),
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: Theme.of(context).textTheme.bodyMedium?.color,
+            ),
           ),
         ),
         ListTile(
@@ -264,7 +264,7 @@ class SettingsScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(AppTheme.spacing8),
               decoration: BoxDecoration(
-                color: AppTheme.gray100,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
               ),
               child: const Text(

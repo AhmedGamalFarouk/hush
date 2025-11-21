@@ -28,37 +28,12 @@ class MessageReactions extends StatelessWidget {
         spacing: AppTheme.spacing4,
         runSpacing: AppTheme.spacing4,
         children: [
-          ...reactions.map(
-            (reaction) => _ReactionChip(
+          ...reactions.map((reaction) {
+            return _ReactionChip(
               reaction: reaction,
               onTap: () => onReactionTap(reaction.emoji),
-            ),
-          ),
-          // Add reaction button
-          InkWell(
-            onTap: onAddReaction,
-            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outline.withValues(alpha: 0.3),
-                  width: 1,
-                ),
-              ),
-              child: Icon(
-                Icons.add,
-                size: 14,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );
@@ -77,34 +52,32 @@ class _ReactionChip extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: isReactedByMe
               ? Theme.of(context).colorScheme.primaryContainer
-              : Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isReactedByMe
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-            width: isReactedByMe ? 1.5 : 1,
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)
+                : Colors.transparent,
+            width: 1,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(reaction.emoji, style: const TextStyle(fontSize: 14)),
+            Text(reaction.emoji, style: const TextStyle(fontSize: 12)),
             if (reaction.count > 1) ...[
               const SizedBox(width: 4),
               Text(
                 reaction.count.toString(),
                 style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                   color: isReactedByMe
                       ? Theme.of(context).colorScheme.onPrimaryContainer
                       : Theme.of(context).colorScheme.onSurfaceVariant,

@@ -89,23 +89,31 @@ class _SessionLobbyScreenState extends ConsumerState<SessionLobbyScreen> {
               Icon(
                 Icons.schedule,
                 size: 16,
-                color: hoursLeft < 1 ? AppTheme.warning : AppTheme.gray600,
+                color: hoursLeft < 1
+                    ? AppTheme.warning
+                    : Theme.of(context).textTheme.bodyMedium?.color,
               ),
               const SizedBox(width: AppTheme.spacing4),
               Text(
                 'Expires in ${_formatExpiry(expiresIn)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: hoursLeft < 1 ? AppTheme.warning : AppTheme.gray600,
+                  color: hoursLeft < 1
+                      ? AppTheme.warning
+                      : Theme.of(context).textTheme.bodyMedium?.color,
                 ),
               ),
               const SizedBox(width: AppTheme.spacing16),
-              Icon(Icons.people, size: 16, color: AppTheme.gray600),
+              Icon(
+                Icons.people,
+                size: 16,
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+              ),
               const SizedBox(width: AppTheme.spacing4),
               Text(
                 '${widget.session.participants.length}/${widget.session.maxParticipants} participants',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppTheme.gray600),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                ),
               ),
             ],
           ),
@@ -122,13 +130,19 @@ class _SessionLobbyScreenState extends ConsumerState<SessionLobbyScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline, size: 64, color: AppTheme.gray400),
+            Icon(
+              Icons.people_outline,
+              size: 64,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
             const SizedBox(height: AppTheme.spacing16),
             Text(
               'Waiting for participants...',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: AppTheme.gray600),
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+              ),
             ),
           ],
         ),
@@ -161,9 +175,9 @@ class _SessionLobbyScreenState extends ConsumerState<SessionLobbyScreen> {
             ),
             subtitle: Text(
               isMe ? 'You' : 'Joined ${_formatJoinTime(participant.joinedAt)}',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppTheme.gray600),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+              ),
             ),
             trailing: participant.isOnline
                 ? Container(
@@ -186,7 +200,7 @@ class _SessionLobbyScreenState extends ConsumerState<SessionLobbyScreen> {
       padding: const EdgeInsets.all(AppTheme.spacing16),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(top: BorderSide(color: AppTheme.gray200)),
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: SafeArea(
         child: ElevatedButton.icon(
@@ -274,9 +288,9 @@ class _SessionLobbyScreenState extends ConsumerState<SessionLobbyScreen> {
             width: 120,
             child: Text(
               '$label:',
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: AppTheme.gray600,
+                color: Theme.of(context).textTheme.bodyMedium?.color,
               ),
             ),
           ),
@@ -295,6 +309,8 @@ class _SessionLobbyScreenState extends ConsumerState<SessionLobbyScreen> {
         builder: (context) => ChatScreen(
           conversationId: widget.session.sessionId,
           conversationName: 'Anonymous Session',
+          isAnonymous: true,
+          sessionExpiresAt: widget.session.expiresAt,
         ),
       ),
     );

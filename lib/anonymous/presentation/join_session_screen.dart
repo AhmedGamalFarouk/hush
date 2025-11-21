@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/theme/app_theme.dart';
 import '../models/anonymous_session.dart';
 import '../services/anonymous_session_service.dart';
+import '../providers/session_storage_provider.dart';
 import 'session_lobby_screen.dart';
 
 class JoinSessionScreen extends ConsumerStatefulWidget {
@@ -67,9 +68,11 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
                   const SizedBox(height: AppTheme.spacing8),
                   Text(
                     'Enter the session code shared by the session creator, or scan the QR code.',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: AppTheme.gray600),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                    ),
                   ),
                 ],
               ),
@@ -192,6 +195,10 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
 
       if (result.isSuccess) {
         final (session, localState) = result.valueOrNull!;
+        
+        // Save session to secure storage
+        final storage = ref.read(anonymousSessionStorageProvider);
+        await storage.saveSession(localState);
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
@@ -213,7 +220,10 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppTheme.gray800),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
     );
   }
 }
