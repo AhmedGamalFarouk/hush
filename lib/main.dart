@@ -1,5 +1,3 @@
-/// Hush - End-to-End Encrypted Chat Application
-/// Main entry point
 library;
 
 import 'package:flutter/material.dart';
@@ -9,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:sodium_libs/sodium_libs.dart';
 import 'core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_provider.dart';
 import 'encryption/providers/encryption_provider.dart';
 import 'presentation/splash/splash_screen.dart';
 
@@ -41,19 +40,19 @@ void main() async {
   );
 }
 
-class HushApp extends StatelessWidget {
+class HushApp extends ConsumerWidget {
   const HushApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeProvider);
+
     return MaterialApp(
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      // Enforce Dark Mode for "Premium Matte & Stealth" aesthetic
-      //TODO: add light/dark mode toggle in settings
-      themeMode: ThemeMode.dark,
+      themeMode: themeMode,
       home: const SplashScreen(),
     );
   }

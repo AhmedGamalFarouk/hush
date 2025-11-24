@@ -3,7 +3,7 @@
 library;
 
 import 'dart:convert';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -118,7 +118,7 @@ class MessageService {
         // Keep reply_to_id - it exists in the database
         await _supabase.from('messages').insert(messageJson);
       } catch (e) {
-        print('Error inserting message: $e');
+        debugPrint('Error inserting message: $e');
         rethrow;
       }
 
@@ -139,21 +139,21 @@ class MessageService {
             .update(updateData)
             .eq('id', conversationId);
       } catch (e) {
-        print('Error updating conversation last_message: $e');
+        debugPrint('Error updating conversation last_message: $e');
         // Don't rethrow - message was sent successfully
       }
 
       return Result.success(message.copyWith(status: MessageStatus.sent));
     } on PostgrestException catch (e) {
-      print(
+      debugPrint(
         'PostgrestException in sendMessage: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}',
       );
       return Result.failure(
         AppError.unknown(message: 'Database error: ${e.message} (${e.code})'),
       );
     } catch (e, stackTrace) {
-      print('Exception in sendMessage: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('Exception in sendMessage: $e');
+      debugPrint('Stack trace: $stackTrace');
       return Result.failure(
         AppError.unknown(message: 'Send message failed: $e'),
       );

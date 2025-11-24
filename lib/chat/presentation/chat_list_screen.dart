@@ -2,8 +2,10 @@
 /// Displays all conversations with real-time updates
 library;
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../presentation/widgets/empty_state.dart';
 import '../../realtime/services/presence_service.dart';
 import '../models/conversation.dart';
@@ -93,6 +95,7 @@ class _ConversationTile extends ConsumerStatefulWidget {
 
 class _ConversationTileState extends ConsumerState<_ConversationTile> {
   UserPresence? _presence;
+  StreamSubscription? _presenceSubscription;
 
   @override
   void initState() {
@@ -100,13 +103,53 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
     _loadPresence();
   }
 
+  @override
+  void dispose() {
+    _presenceSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadPresence() async {
     // Only show presence for direct chats
     if (widget.conversation.type != ConversationType.direct) return;
 
-    // Get other user ID from conversation members
-    // For now, we'll implement this when we have members info
-    // TODO: Get other user ID and fetch presence
+    final conversationService = ref.read(conversationServiceProvider);
+    final membersResult = await conversationService.getConversationMembers(
+      widget.conversation.id,
+    );
+
+    if (membersResult.isSuccess && mounted) {
+      final members = membersResult.valueOrNull!;
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+
+      // Find other user
+      try {
+        final otherMember = members.firstWhere((m) => m.id != currentUserId);
+
+        final presenceService = ref.read(presenceServiceProvider);
+
+        // Get initial presence
+        final presence = await presenceService.getUserPresence(otherMember.id);
+        if (mounted) {
+          setState(() {
+            _presence = presence;
+          });
+        }
+
+        // Subscribe to updates
+        _presenceSubscription = presenceService
+            .subscribeToPresence([otherMember.id])
+            .listen((presences) {
+              if (mounted && presences.containsKey(otherMember.id)) {
+                setState(() {
+                  _presence = presences[otherMember.id];
+                });
+              }
+            });
+      } catch (e) {
+        // No other member found or error
+      }
+    }
   }
 
   Color _getAvatarColor(String name) {
@@ -221,7 +264,9 @@ class _ConversationTileState extends ConsumerState<_ConversationTile> {
             Icon(
               isAnonymous ? Icons.vpn_key : Icons.lock,
               size: 12,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.7),
             ),
             const SizedBox(width: 4),
             Expanded(

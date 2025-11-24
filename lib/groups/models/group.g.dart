@@ -35,6 +35,7 @@ _$GroupMemberImpl _$$GroupMemberImplFromJson(Map<String, dynamic> json) =>
     _$GroupMemberImpl(
       userId: json['userId'] as String,
       displayName: json['displayName'] as String,
+      avatarUrl: json['avatarUrl'] as String?,
       joinedAt: DateTime.parse(json['joinedAt'] as String),
       isAdmin: json['isAdmin'] as bool? ?? false,
       isActive: json['isActive'] as bool? ?? true,
@@ -44,6 +45,7 @@ Map<String, dynamic> _$$GroupMemberImplToJson(_$GroupMemberImpl instance) =>
     <String, dynamic>{
       'userId': instance.userId,
       'displayName': instance.displayName,
+      'avatarUrl': instance.avatarUrl,
       'joinedAt': instance.joinedAt.toIso8601String(),
       'isAdmin': instance.isAdmin,
       'isActive': instance.isActive,

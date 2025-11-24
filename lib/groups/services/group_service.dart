@@ -166,6 +166,19 @@ class GroupService {
           .eq('conversation_id', groupId)
           .single();
 
+      final membersList = response['conversation_members'] as List;
+      final memberIds = membersList.map((m) => m['user_id'] as String).toList();
+
+      // Fetch profiles
+      final profilesResponse = await _supabase
+          .from('profiles')
+          .select('id, display_name, username, avatar_url')
+          .inFilter('id', memberIds);
+
+      final profilesMap = {
+        for (var p in profilesResponse as List) p['id'] as String: p,
+      };
+
       final group = Group(
         id: groupId,
         name: response['name'] as String,
@@ -173,16 +186,24 @@ class GroupService {
         createdAt: DateTime.parse(response['created_at'] as String),
         createdBy: response['created_by'] as String,
         keyVersion: response['key_version'] as int,
-        members: (response['conversation_members'] as List)
-            .map(
-              (m) => GroupMember(
-                userId: m['user_id'] as String,
-                displayName: 'User', // TODO: Fetch from profiles
-                joinedAt: DateTime.parse(m['joined_at'] as String),
-                isAdmin: m['is_admin'] as bool? ?? false,
-              ),
-            )
-            .toList(),
+        members: membersList.map((m) {
+          final userId = m['user_id'] as String;
+          final profile = profilesMap[userId];
+          final displayName = profile != null
+              ? (profile['display_name'] as String? ??
+                    profile['username'] as String? ??
+                    'User')
+              : 'User';
+          final avatarUrl = profile?['avatar_url'] as String?;
+
+          return GroupMember(
+            userId: userId,
+            displayName: displayName,
+            avatarUrl: avatarUrl,
+            joinedAt: DateTime.parse(m['joined_at'] as String),
+            isAdmin: m['is_admin'] as bool? ?? false,
+          );
+        }).toList(),
       );
 
       return Result.success(group);
@@ -499,6 +520,42 @@ class GroupService {
         'nonce': base64Url.encode(encrypted.nonce),
         'created_at': DateTime.now().toIso8601String(),
       });
+    }
+  }
+
+  /// Update group info (name, description)
+  Future<Result<void, AppError>> updateGroup({
+    required String groupId,
+    required String name,
+    String? description,
+  }) async {
+    try {
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null) {
+        return Result.failure(
+          AppError.authentication(message: 'Not authenticated'),
+        );
+      }
+
+      // 1. Check if current user is admin
+      final isAdminResult = await _isAdmin(groupId, currentUserId);
+      if (isAdminResult.isFailure || !isAdminResult.valueOrNull!) {
+        return Result.failure(
+          AppError.unknown(message: 'Only admins can update group info'),
+        );
+      }
+
+      // 2. Update group metadata
+      await _supabase
+          .from('group_metadata')
+          .update({'name': name, 'description': description})
+          .eq('conversation_id', groupId);
+
+      return const Result.success(null);
+    } catch (e) {
+      return Result.failure(
+        AppError.unknown(message: 'Failed to update group: $e'),
+      );
     }
   }
 }

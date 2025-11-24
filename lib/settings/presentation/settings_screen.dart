@@ -1,3 +1,4 @@
+// ignore_for_file: deprecated_member_use
 /// Settings Screen
 /// App settings, profile, theme, and preferences
 library;
@@ -5,9 +6,16 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_provider.dart';
 import '../../auth/services/auth_service.dart';
 import '../../auth/presentation/login_screen.dart';
+import '../providers/notification_settings_provider.dart';
 import 'edit_profile_screen.dart';
+import 'change_password_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'terms_of_service_screen.dart';
+
+import '../../media/services/media_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -16,6 +24,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authService = ref.watch(authServiceProvider);
     final user = authService.currentUser;
+    final themeMode = ref.watch(themeProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -26,11 +35,11 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(),
 
           // App settings
-          _buildSettingsSection(context),
+          _buildSettingsSection(context, ref, themeMode),
           const Divider(),
 
           // Security & Privacy
-          _buildSecuritySection(context),
+          _buildSecuritySection(context, ref, user),
           const Divider(),
 
           // About section
@@ -73,7 +82,26 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSettingsSection(BuildContext context) {
+  Widget _buildSettingsSection(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeMode themeMode,
+  ) {
+    final notificationsEnabled = ref.watch(notificationSettingsProvider);
+
+    String themeText;
+    switch (themeMode) {
+      case ThemeMode.light:
+        themeText = 'Light';
+        break;
+      case ThemeMode.dark:
+        themeText = 'Dark';
+        break;
+      case ThemeMode.system:
+        themeText = 'System';
+        break;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -94,26 +122,32 @@ class SettingsScreen extends ConsumerWidget {
         ListTile(
           leading: const Icon(Icons.palette_outlined),
           title: const Text('Theme'),
-          subtitle: const Text('Light / Dark / System'),
+          subtitle: Text(themeText),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            _showThemeDialog(context);
+            _showThemeDialog(context, ref, themeMode);
           },
         ),
         SwitchListTile(
           secondary: const Icon(Icons.notifications_outlined),
           title: const Text('Notifications'),
           subtitle: const Text('Receive message notifications'),
-          value: true, // TODO: Connect to actual setting
+          value: notificationsEnabled,
           onChanged: (value) {
-            // TODO: Update notification preference
+            ref
+                .read(notificationSettingsProvider.notifier)
+                .toggleNotifications(value);
           },
         ),
       ],
     );
   }
 
-  Widget _buildSecuritySection(BuildContext context) {
+  Widget _buildSecuritySection(
+    BuildContext context,
+    WidgetRef ref,
+    dynamic user,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -136,7 +170,11 @@ class SettingsScreen extends ConsumerWidget {
           title: const Text('Change Password'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // TODO: Navigate to change password
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const ChangePasswordScreen(),
+              ),
+            );
           },
         ),
         ListTile(
@@ -145,7 +183,7 @@ class SettingsScreen extends ConsumerWidget {
           subtitle: const Text('View your public key'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            _showKeysDialog(context);
+            _showKeysDialog(context, user);
           },
         ),
         ListTile(
@@ -153,7 +191,7 @@ class SettingsScreen extends ConsumerWidget {
           title: const Text('Clear Media Cache'),
           subtitle: const Text('Free up storage space'),
           onTap: () {
-            _showClearCacheDialog(context);
+            _showClearCacheDialog(context, ref);
           },
         ),
       ],
@@ -188,7 +226,11 @@ class SettingsScreen extends ConsumerWidget {
           title: const Text('Privacy Policy'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // TODO: Show privacy policy
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const PrivacyPolicyScreen(),
+              ),
+            );
           },
         ),
         ListTile(
@@ -196,7 +238,11 @@ class SettingsScreen extends ConsumerWidget {
           title: const Text('Terms of Service'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // TODO: Show terms
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const TermsOfServiceScreen(),
+              ),
+            );
           },
         ),
       ],
@@ -215,27 +261,52 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showThemeDialog(BuildContext context) {
+  void _showThemeDialog(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeMode currentMode,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Choose Theme'),
-        content: RadioGroup<String>(
-          onChanged: (value) {
-            // TODO: Update theme with value
-            Navigator.pop(context);
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioListTile<String>(title: const Text('Light'), value: 'light'),
-              RadioListTile<String>(title: const Text('Dark'), value: 'dark'),
-              RadioListTile<String>(
-                title: const Text('System'),
-                value: 'system',
-              ),
-            ],
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<ThemeMode>(
+              title: const Text('Light'),
+              value: ThemeMode.light,
+              groupValue: currentMode,
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(themeProvider.notifier).setTheme(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Dark'),
+              value: ThemeMode.dark,
+              groupValue: currentMode,
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(themeProvider.notifier).setTheme(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('System'),
+              value: ThemeMode.system,
+              groupValue: currentMode,
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(themeProvider.notifier).setTheme(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -247,7 +318,10 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showKeysDialog(BuildContext context) {
+  void _showKeysDialog(BuildContext context, dynamic user) {
+    final publicKey =
+        user?.userMetadata?['public_key'] as String? ?? 'Not available';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -267,9 +341,9 @@ class SettingsScreen extends ConsumerWidget {
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
               ),
-              child: const Text(
-                'pk_xxxxxxxxxxxxx...', // TODO: Get actual public key
-                style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+              child: SelectableText(
+                publicKey,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
               ),
             ),
           ],
@@ -284,7 +358,7 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showClearCacheDialog(BuildContext context) {
+  void _showClearCacheDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -298,12 +372,14 @@ class SettingsScreen extends ConsumerWidget {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              // TODO: Clear cache
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Cache cleared')));
+              await ref.read(mediaServiceProvider).clearCache();
+              if (context.mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Cache cleared')));
+              }
             },
             style: TextButton.styleFrom(foregroundColor: AppTheme.warning),
             child: const Text('Clear'),

@@ -2,9 +2,15 @@
 /// Edit user display name, bio, and avatar
 library;
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
+import '../../auth/services/auth_service.dart';
+import '../../media/services/media_service.dart';
+import '../../core/supabase/supabase_provider.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -16,7 +22,9 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _bioController = TextEditingController();
+  bool _isLoading = true;
   bool _isSaving = false;
+  String? _avatarUrl;
 
   @override
   void initState() {
@@ -31,14 +39,44 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.dispose();
   }
 
-  void _loadProfile() {
-    // TODO: Load user profile from Supabase
-    _nameController.text = 'User Name';
-    _bioController.text = '';
+  Future<void> _loadProfile() async {
+    try {
+      final authService = ref.read(authServiceProvider);
+      final user = authService.currentUser;
+
+      if (user == null) return;
+
+      final supabase = ref.read(supabaseProvider);
+      final data = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .single();
+
+      if (mounted) {
+        setState(() {
+          _nameController.text = data['display_name'] as String? ?? '';
+          _bioController.text = data['bio'] as String? ?? '';
+          _avatarUrl = data['avatar_url'] as String?;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load profile: $e')));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),
@@ -71,11 +109,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     backgroundColor: Theme.of(
                       context,
                     ).colorScheme.primary.withValues(alpha: 0.1),
-                    child: Icon(
-                      Icons.person,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    backgroundImage: _avatarUrl != null
+                        ? CachedNetworkImageProvider(_avatarUrl!)
+                        : null,
+                    child: _avatarUrl == null
+                        ? Icon(
+                            Icons.person,
+                            size: 64,
+                            color: Theme.of(context).colorScheme.primary,
+                          )
+                        : null,
                   ),
                   Positioned(
                     bottom: 0,
@@ -122,21 +165,70 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  void _changeAvatar() {
-    // TODO: Implement avatar picker
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Change Avatar'),
-        content: const Text('Coming soon...'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+  Future<void> _changeAvatar() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
     );
+
+    if (pickedFile == null) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final authService = ref.read(authServiceProvider);
+      final user = authService.currentUser;
+      if (user == null) return;
+
+      final mediaService = ref.read(mediaServiceProvider);
+      final result = await mediaService.uploadProfilePicture(
+        file: File(pickedFile.path),
+        userId: user.id,
+      );
+
+      if (result.isSuccess) {
+        final url = result.valueOrNull!;
+
+        // Update profile with new avatar URL immediately
+        final supabase = ref.read(supabaseProvider);
+        await supabase
+            .from('profiles')
+            .update({
+              'avatar_url': url,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', user.id);
+
+        if (mounted) {
+          setState(() {
+            _avatarUrl = url;
+          });
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to upload avatar: ${result.errorOrNull?.message}',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -145,16 +237,33 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     });
 
     try {
-      // TODO: Update profile in Supabase
-      await Future.delayed(const Duration(seconds: 1));
+      final authService = ref.read(authServiceProvider);
+      final user = authService.currentUser;
 
-      if (!mounted) return;
+      if (user != null) {
+        final supabase = ref.read(supabaseProvider);
+        await supabase
+            .from('profiles')
+            .update({
+              'display_name': _nameController.text.trim(),
+              'bio': _bioController.text.trim(),
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', user.id);
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Profile updated')));
-
-      Navigator.pop(context);
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Profile updated')));
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update profile: $e')));
+      }
     } finally {
       if (mounted) {
         setState(() {

@@ -11,21 +11,11 @@ import '../../core/utils/result.dart';
 
 /// Encrypted message structure
 class EncryptedMessage {
-  final Uint8List ciphertext;
-  final Uint8List nonce;
-  final String? senderBlob;
-
   const EncryptedMessage({
     required this.ciphertext,
     required this.nonce,
     this.senderBlob,
   });
-
-  Map<String, dynamic> toJson() => {
-    'ciphertext': base64Url.encode(ciphertext),
-    'nonce': base64Url.encode(nonce),
-    if (senderBlob != null) 'sender_blob': senderBlob,
-  };
 
   factory EncryptedMessage.fromJson(Map<String, dynamic> json) =>
       EncryptedMessage(
@@ -33,25 +23,37 @@ class EncryptedMessage {
         nonce: base64Url.decode(json['nonce'] as String),
         senderBlob: json['sender_blob'] as String?,
       );
+
+  final Uint8List ciphertext;
+  final Uint8List nonce;
+  final String? senderBlob;
+
+  Map<String, dynamic> toJson() => {
+    'ciphertext': base64Url.encode(ciphertext),
+    'nonce': base64Url.encode(nonce),
+    if (senderBlob != null) 'sender_blob': senderBlob,
+  };
 }
 
 /// Key pair for asymmetric encryption
 class KeyPair {
+  const KeyPair({required this.publicKey, required this.secretKey});
+
   final Uint8List publicKey;
   final Uint8List secretKey;
 
-  const KeyPair({required this.publicKey, required this.secretKey});
-
   String get publicKeyBase64 => base64Url.encode(publicKey);
+
   String get secretKeyBase64 => base64Url.encode(secretKey);
 }
 
 /// Simplified encryption service
 class EncryptionService {
-  final Sodium _sodium;
+  EncryptionService({required Sodium sodium}) : _sodium = sodium;
+
   static const _uuid = Uuid();
 
-  EncryptionService({required Sodium sodium}) : _sodium = sodium;
+  final Sodium _sodium;
 
   // ===========================================================================
   // KEY GENERATION
@@ -162,22 +164,147 @@ class EncryptionService {
   // DIFFIE-HELLMAN KEY EXCHANGE
   // ===========================================================================
 
+  /// Perform X25519 Diffie-Hellman key exchange
+  ///
+  /// Computes shared secret using X25519 key exchange.
+  /// The shared secret can be used directly as an encryption key.
+  ///
+  /// Note: This uses crypto.box.easy internally which performs X25519 DH.
+  /// For a pure shared secret, we derive from an ephemeral encryption.
   Future<Result<Uint8List, AppError>> performKeyExchange({
     required Uint8List mySecretKey,
     required Uint8List theirPublicKey,
   }) async {
     try {
-      // Simplified: use generic hash of combined keys as shared secret
-      // In production, this should use proper X25519 DH (crypto.scalarmult)
-      final combined = Uint8List.fromList([...mySecretKey, ...theirPublicKey]);
+      // Create a deterministic "context" message for key derivation
+      final context = Uint8List.fromList(utf8.encode('hush_kx_v1'));
+      final nonce = Uint8List(24); // Zero nonce for deterministic result
+
+      // Use box to create shared secret (involves X25519 DH)
+      final encrypted = _sodium.crypto.box.easy(
+        message: context,
+        nonce: nonce,
+        publicKey: theirPublicKey,
+        secretKey: SecureKey.fromList(_sodium, mySecretKey),
+      );
+
+      // Hash the result to get clean 32-byte key
       final sharedSecret = _sodium.crypto.genericHash(
-        message: combined,
+        message: Uint8List.fromList(encrypted),
         outLen: 32,
       );
+
       return Result.success(Uint8List.fromList(sharedSecret));
     } catch (e) {
       return Result.failure(
         AppError.encryption(message: 'Key exchange failed: $e'),
+      );
+    }
+  }
+
+  // ===========================================================================
+  // ASYMMETRIC ENCRYPTION (Box / Sealed Box)
+  // ===========================================================================
+
+  /// Encrypt data for a recipient using their public key (sealed box)
+  ///
+  /// This uses crypto.box.seal which provides anonymous encryption:
+  /// - Recipient can decrypt with their secret key
+  /// - No sender authentication (anonymous)
+  /// - Perfect for encrypting conversation keys for group members
+  ///
+  /// Use case: Encrypt a conversation key for a new group member
+  Future<Result<Uint8List, AppError>> sealBox({
+    required Uint8List plaintext,
+    required Uint8List recipientPublicKey,
+  }) async {
+    try {
+      final ciphertext = _sodium.crypto.box.seal(
+        message: plaintext,
+        publicKey: recipientPublicKey,
+      );
+      return Result.success(Uint8List.fromList(ciphertext));
+    } catch (e) {
+      return Result.failure(
+        AppError.encryption(message: 'Sealed box encryption failed: $e'),
+      );
+    }
+  }
+
+  /// Decrypt data encrypted with sealed box using my secret key
+  ///
+  /// Requires both public and secret key to decrypt sealed box.
+  Future<Result<Uint8List, AppError>> openSealedBox({
+    required Uint8List ciphertext,
+    required Uint8List myPublicKey,
+    required Uint8List mySecretKey,
+  }) async {
+    try {
+      final plaintext = _sodium.crypto.box.sealOpen(
+        cipherText: ciphertext,
+        publicKey: myPublicKey,
+        secretKey: SecureKey.fromList(_sodium, mySecretKey),
+      );
+      return Result.success(Uint8List.fromList(plaintext));
+    } catch (e) {
+      return Result.failure(
+        AppError.decryption(message: 'Sealed box decryption failed: $e'),
+      );
+    }
+  }
+
+  /// Authenticated encryption from sender to recipient
+  ///
+  /// Unlike sealed box, this includes sender authentication.
+  /// Recipient knows the message came from the claimed sender.
+  ///
+  /// Use case: Sending encrypted messages in a conversation
+  Future<Result<EncryptedMessage, AppError>> encryptBox({
+    required Uint8List plaintext,
+    required Uint8List mySecretKey,
+    required Uint8List theirPublicKey,
+  }) async {
+    try {
+      final nonce = _sodium.randombytes.buf(_sodium.crypto.box.nonceBytes);
+
+      final ciphertext = _sodium.crypto.box.easy(
+        message: plaintext,
+        nonce: Uint8List.fromList(nonce),
+        publicKey: theirPublicKey,
+        secretKey: SecureKey.fromList(_sodium, mySecretKey),
+      );
+
+      return Result.success(
+        EncryptedMessage(
+          ciphertext: Uint8List.fromList(ciphertext),
+          nonce: Uint8List.fromList(nonce),
+        ),
+      );
+    } catch (e) {
+      return Result.failure(
+        AppError.encryption(message: 'Box encryption failed: $e'),
+      );
+    }
+  }
+
+  /// Decrypt authenticated box message
+  Future<Result<Uint8List, AppError>> decryptBox({
+    required EncryptedMessage encrypted,
+    required Uint8List mySecretKey,
+    required Uint8List theirPublicKey,
+  }) async {
+    try {
+      final plaintext = _sodium.crypto.box.openEasy(
+        cipherText: encrypted.ciphertext,
+        nonce: encrypted.nonce,
+        publicKey: theirPublicKey,
+        secretKey: SecureKey.fromList(_sodium, mySecretKey),
+      );
+
+      return Result.success(Uint8List.fromList(plaintext));
+    } catch (e) {
+      return Result.failure(
+        AppError.decryption(message: 'Box decryption failed: $e'),
       );
     }
   }
@@ -332,7 +459,7 @@ class EncryptionService {
   String generateSessionId() => _uuid.v4();
 
   String generateHumanCode(Uint8List key) {
-    final hash = _sodium.crypto.genericHash(message: key, outLen: 4);
+    final hash = _sodium.crypto.genericHash(message: key, outLen: 16);
     final number = hash[0] << 24 | hash[1] << 16 | hash[2] << 8 | hash[3];
     return 'HUSH-${number.toRadixString(36).toUpperCase()}';
   }

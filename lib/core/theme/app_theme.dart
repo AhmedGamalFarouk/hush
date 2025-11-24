@@ -141,7 +141,9 @@ class AppTheme {
           backgroundColor: _electricBlue,
           foregroundColor: _midnightBlue, // Contrast text
           elevation: 4,
-          shadowColor: _electricBlue.withOpacity(0.4), // Colored shadow/glow
+          shadowColor: _electricBlue.withValues(
+            alpha: 0.4,
+          ), // Colored shadow/glow
           padding: const EdgeInsets.symmetric(
             horizontal: spacing32,
             vertical: spacing16,
@@ -409,7 +411,7 @@ class AppTheme {
         fontSize: 12,
         fontWeight: FontWeight.w400,
         letterSpacing: 0.4,
-        color: baseColor.withOpacity(0.7),
+        color: baseColor.withValues(alpha: 0.7),
       ),
 
       // Label

@@ -1,5 +1,5 @@
 name: hush
-description: "A new Flutter project."
+description: "Hush - End-to-End Encrypted Chat Application. Secure, private, and anonymous messaging."
 
 publish_to: 'none'
 
@@ -52,6 +52,8 @@ dependencies:
   json_annotation: ^4.9.0
   
   cupertino_icons: ^1.0.8
+  shared_preferences: ^2.5.3
+  open_filex: ^4.7.0
 
 dev_dependencies:
   flutter_test:

@@ -6,12 +6,13 @@
 ///    - Generate unique media_key (256-bit random) per file
 ///    - Encrypt file with AEAD (XChaCha20-Poly1305)
 ///    - Upload encrypted file to Supabase Storage
-///    - Store media_key in message metadata (encrypted with conversation key)
+///    - Encrypt media_key with conversation key and store in message metadata
 ///
 /// 2. File Download:
 ///    - Fetch encrypted file from storage
-///    - Decrypt using media_key from message
-///    - Cache decrypted file locally for performance
+///    - Decrypt conversation key to get media key
+///    - Decrypt media key to get actual file decryption key
+///    - Decrypt file and cache locally for performance
 ///
 /// 3. Thumbnails:
 ///    - Generate thumbnail before encryption
@@ -19,6 +20,7 @@
 ///    - Store as separate file in storage
 library;
 
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -91,9 +93,11 @@ class MediaService {
   // ============================================================================
 
   /// Encrypt and upload a file
+  /// Returns metadata including encrypted media key
   Future<Result<EncryptedMedia, AppError>> encryptAndUpload({
     required File file,
     required String conversationId,
+    required Uint8List conversationKey, // NEW: Pass conversation key
     String? fileName,
   }) async {
     try {
@@ -101,14 +105,14 @@ class MediaService {
       final fileBytes = await file.readAsBytes();
       final actualFileName = fileName ?? file.path.split('/').last;
 
-      // 2. Generate unique media key
+      // 2. Generate unique media key (CRITICAL SECURITY FIX)
       final mediaKeyResult = await _encryption.generateRandomKey();
       if (mediaKeyResult.isFailure) {
         return Result.failure(mediaKeyResult.errorOrNull!);
       }
       final mediaKey = mediaKeyResult.valueOrNull!;
 
-      // 3. Encrypt file
+      // 3. Encrypt file with media key
       final encryptResult = await _encryption.encryptData(
         data: fileBytes,
         key: mediaKey,
@@ -137,13 +141,31 @@ class MediaService {
       // 7. Get public URL
       final url = _supabase.storage.from(_bucket).getPublicUrl(storagePath);
 
-      // 8. Determine media type
+      // 8. CRITICAL SECURITY FIX: Encrypt media key with conversation key
+      final encryptMediaKeyResult = await _encryption.encryptData(
+        data: mediaKey,
+        key: conversationKey,
+      );
+
+      if (encryptMediaKeyResult.isFailure) {
+        return Result.failure(encryptMediaKeyResult.errorOrNull!);
+      }
+
+      final encryptedMediaKey = encryptMediaKeyResult.valueOrNull!;
+
+      // Encode encrypted media key as JSON for storage in message metadata
+      final encryptedMediaKeyJson = jsonEncode({
+        'ciphertext': base64Url.encode(encryptedMediaKey.ciphertext),
+        'nonce': base64Url.encode(encryptedMediaKey.nonce),
+      });
+
+      // 9. Determine media type
       final mediaType = _determineMediaType(actualFileName);
 
       return Result.success(
         EncryptedMedia(
           url: url,
-          mediaKey: _encryption.generateRandomString(32), // Store securely
+          mediaKey: encryptedMediaKeyJson, // Store encrypted media key
           mediaType: mediaType,
           fileSize: fileBytes.length,
           fileName: actualFileName,
@@ -161,8 +183,10 @@ class MediaService {
   // ============================================================================
 
   /// Download and decrypt a file
+  /// Decrypts media key from message metadata using conversation key
   Future<Result<File, AppError>> downloadAndDecrypt({
     required EncryptedMedia media,
+    required Uint8List conversationKey, // NEW: Pass conversation key
   }) async {
     try {
       // 1. Check cache first
@@ -181,8 +205,29 @@ class MediaService {
       final nonce = Uint8List.fromList(encryptedBytes.sublist(0, nonceSize));
       final ciphertext = Uint8List.fromList(encryptedBytes.sublist(nonceSize));
 
-      // 4. Decrypt
-      final mediaKey = Uint8List(32); // TODO: Get from message metadata
+      // 4. CRITICAL SECURITY FIX: Decrypt media key from message metadata
+      final encryptedMediaKeyJson =
+          jsonDecode(media.mediaKey) as Map<String, dynamic>;
+      final encryptedMediaKey = EncryptedMessage(
+        ciphertext: base64Url.decode(
+          encryptedMediaKeyJson['ciphertext'] as String,
+        ),
+        nonce: base64Url.decode(encryptedMediaKeyJson['nonce'] as String),
+      );
+
+      // Decrypt media key using conversation key
+      final decryptMediaKeyResult = await _encryption.decryptData(
+        encrypted: encryptedMediaKey,
+        key: conversationKey,
+      );
+
+      if (decryptMediaKeyResult.isFailure) {
+        return Result.failure(decryptMediaKeyResult.errorOrNull!);
+      }
+
+      final mediaKey = decryptMediaKeyResult.valueOrNull!;
+
+      // 5. Decrypt file using media key
       final encrypted = EncryptedMessage(ciphertext: ciphertext, nonce: nonce);
 
       final decryptResult = await _encryption.decryptData(
@@ -196,7 +241,7 @@ class MediaService {
 
       final decryptedBytes = decryptResult.valueOrNull!;
 
-      // 5. Save to cache
+      // 6. Save to cache
       final cacheFile = await _cacheFile(media.url, decryptedBytes);
 
       return Result.success(cacheFile);
@@ -290,6 +335,42 @@ class MediaService {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     } else {
       return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    }
+  }
+
+  // ============================================================================
+  // PROFILE PICTURES
+  // ============================================================================
+
+  /// Upload profile picture
+  /// Uploads to 'avatars' bucket (public)
+  Future<Result<String, AppError>> uploadProfilePicture({
+    required File file,
+    required String userId,
+  }) async {
+    try {
+      final fileBytes = await file.readAsBytes();
+      final fileExt = file.path.split('.').last;
+      final fileName =
+          '$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+
+      // Upload to avatars bucket
+      await _supabase.storage
+          .from('avatars')
+          .uploadBinary(
+            fileName,
+            fileBytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
+
+      // Get public URL
+      final url = _supabase.storage.from('avatars').getPublicUrl(fileName);
+
+      return Result.success(url);
+    } catch (e) {
+      return Result.failure(
+        AppError.unknown(message: 'Failed to upload profile picture: $e'),
+      );
     }
   }
 }

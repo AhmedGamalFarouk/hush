@@ -320,6 +320,7 @@ GroupMember _$GroupMemberFromJson(Map<String, dynamic> json) {
 mixin _$GroupMember {
   String get userId => throw _privateConstructorUsedError;
   String get displayName => throw _privateConstructorUsedError;
+  String? get avatarUrl => throw _privateConstructorUsedError;
   DateTime get joinedAt => throw _privateConstructorUsedError;
   bool get isAdmin => throw _privateConstructorUsedError;
   bool get isActive => throw _privateConstructorUsedError;
@@ -344,6 +345,7 @@ abstract class $GroupMemberCopyWith<$Res> {
   $Res call({
     String userId,
     String displayName,
+    String? avatarUrl,
     DateTime joinedAt,
     bool isAdmin,
     bool isActive,
@@ -367,6 +369,7 @@ class _$GroupMemberCopyWithImpl<$Res, $Val extends GroupMember>
   $Res call({
     Object? userId = null,
     Object? displayName = null,
+    Object? avatarUrl = freezed,
     Object? joinedAt = null,
     Object? isAdmin = null,
     Object? isActive = null,
@@ -381,6 +384,10 @@ class _$GroupMemberCopyWithImpl<$Res, $Val extends GroupMember>
                 ? _value.displayName
                 : displayName // ignore: cast_nullable_to_non_nullable
                       as String,
+            avatarUrl: freezed == avatarUrl
+                ? _value.avatarUrl
+                : avatarUrl // ignore: cast_nullable_to_non_nullable
+                      as String?,
             joinedAt: null == joinedAt
                 ? _value.joinedAt
                 : joinedAt // ignore: cast_nullable_to_non_nullable
@@ -411,6 +418,7 @@ abstract class _$$GroupMemberImplCopyWith<$Res>
   $Res call({
     String userId,
     String displayName,
+    String? avatarUrl,
     DateTime joinedAt,
     bool isAdmin,
     bool isActive,
@@ -433,6 +441,7 @@ class __$$GroupMemberImplCopyWithImpl<$Res>
   $Res call({
     Object? userId = null,
     Object? displayName = null,
+    Object? avatarUrl = freezed,
     Object? joinedAt = null,
     Object? isAdmin = null,
     Object? isActive = null,
@@ -447,6 +456,10 @@ class __$$GroupMemberImplCopyWithImpl<$Res>
             ? _value.displayName
             : displayName // ignore: cast_nullable_to_non_nullable
                   as String,
+        avatarUrl: freezed == avatarUrl
+            ? _value.avatarUrl
+            : avatarUrl // ignore: cast_nullable_to_non_nullable
+                  as String?,
         joinedAt: null == joinedAt
             ? _value.joinedAt
             : joinedAt // ignore: cast_nullable_to_non_nullable
@@ -470,6 +483,7 @@ class _$GroupMemberImpl implements _GroupMember {
   const _$GroupMemberImpl({
     required this.userId,
     required this.displayName,
+    this.avatarUrl,
     required this.joinedAt,
     this.isAdmin = false,
     this.isActive = true,
@@ -483,6 +497,8 @@ class _$GroupMemberImpl implements _GroupMember {
   @override
   final String displayName;
   @override
+  final String? avatarUrl;
+  @override
   final DateTime joinedAt;
   @override
   @JsonKey()
@@ -493,7 +509,7 @@ class _$GroupMemberImpl implements _GroupMember {
 
   @override
   String toString() {
-    return 'GroupMember(userId: $userId, displayName: $displayName, joinedAt: $joinedAt, isAdmin: $isAdmin, isActive: $isActive)';
+    return 'GroupMember(userId: $userId, displayName: $displayName, avatarUrl: $avatarUrl, joinedAt: $joinedAt, isAdmin: $isAdmin, isActive: $isActive)';
   }
 
   @override
@@ -504,6 +520,8 @@ class _$GroupMemberImpl implements _GroupMember {
             (identical(other.userId, userId) || other.userId == userId) &&
             (identical(other.displayName, displayName) ||
                 other.displayName == displayName) &&
+            (identical(other.avatarUrl, avatarUrl) ||
+                other.avatarUrl == avatarUrl) &&
             (identical(other.joinedAt, joinedAt) ||
                 other.joinedAt == joinedAt) &&
             (identical(other.isAdmin, isAdmin) || other.isAdmin == isAdmin) &&
@@ -517,6 +535,7 @@ class _$GroupMemberImpl implements _GroupMember {
     runtimeType,
     userId,
     displayName,
+    avatarUrl,
     joinedAt,
     isAdmin,
     isActive,
@@ -540,6 +559,7 @@ abstract class _GroupMember implements GroupMember {
   const factory _GroupMember({
     required final String userId,
     required final String displayName,
+    final String? avatarUrl,
     required final DateTime joinedAt,
     final bool isAdmin,
     final bool isActive,
@@ -552,6 +572,8 @@ abstract class _GroupMember implements GroupMember {
   String get userId;
   @override
   String get displayName;
+  @override
+  String? get avatarUrl;
   @override
   DateTime get joinedAt;
   @override

@@ -28,6 +28,7 @@ class GroupMember with _$GroupMember {
   const factory GroupMember({
     required String userId,
     required String displayName,
+    String? avatarUrl,
     required DateTime joinedAt,
     @Default(false) bool isAdmin,
     @Default(true) bool isActive,

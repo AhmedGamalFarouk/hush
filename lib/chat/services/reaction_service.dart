@@ -3,6 +3,7 @@
 library;
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -29,13 +30,13 @@ class ReactionService {
     try {
       final currentUser = _supabase.auth.currentUser;
       if (currentUser == null) {
-        print('Cannot add reaction: User not authenticated');
+        debugPrint('Cannot add reaction: User not authenticated');
         return Result.failure(
           AppError.authentication(message: 'User not authenticated'),
         );
       }
 
-      print(
+      debugPrint(
         'Adding reaction $emoji to message $messageId by user ${currentUser.id}',
       );
 
@@ -49,7 +50,7 @@ class ReactionService {
           .maybeSingle();
 
       if (existing != null) {
-        print('User already reacted with $emoji, toggling off');
+        debugPrint('User already reacted with $emoji, toggling off');
         // Already reacted with this emoji, remove it (toggle)
         return removeReaction(messageId: messageId, emoji: emoji);
       }
@@ -63,10 +64,10 @@ class ReactionService {
         'created_at': DateTime.now().toUtc().toIso8601String(),
       });
 
-      print('Reaction added successfully');
+      debugPrint('Reaction added successfully');
       return const Result.success(null);
     } catch (e) {
-      print('Error adding reaction: $e');
+      debugPrint('Error adding reaction: $e');
       return Result.failure(
         AppError.unknown(message: 'Add reaction failed: $e'),
       );
@@ -162,17 +163,19 @@ class ReactionService {
             value: messageId,
           ),
           callback: (payload) async {
-            print(
+            debugPrint(
               'Reaction change detected for message $messageId: ${payload.eventType}',
             );
             final result = await getReactions(messageId: messageId);
             if (result.isSuccess && !controller.isClosed) {
-              print(
+              debugPrint(
                 'Adding ${result.valueOrNull?.length ?? 0} reactions to stream',
               );
               controller.add(result.valueOrNull ?? []);
             } else if (result.isFailure) {
-              print('Failed to get reactions: ${result.errorOrNull?.message}');
+              debugPrint(
+                'Failed to get reactions: ${result.errorOrNull?.message}',
+              );
             }
           },
         )
@@ -181,12 +184,12 @@ class ReactionService {
     // Send initial state
     getReactions(messageId: messageId).then((result) {
       if (result.isSuccess && !controller.isClosed) {
-        print(
+        debugPrint(
           'Initial reactions loaded: ${result.valueOrNull?.length ?? 0} for message $messageId',
         );
         controller.add(result.valueOrNull ?? []);
       } else if (result.isFailure) {
-        print(
+        debugPrint(
           'Failed to load initial reactions: ${result.errorOrNull?.message}',
         );
       }

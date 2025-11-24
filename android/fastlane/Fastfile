@@ -1,0 +1,25 @@
+default_platform(:android)
+
+platform :android do
+  desc "Runs all the tests"
+  lane :test do
+    gradle(task: "test")
+  end
+
+  desc "Submit a new Beta Build to Crashlytics Beta"
+  lane :beta do
+    gradle(task: "clean assembleRelease")
+    # crashlytics
+  end
+
+  desc "Deploy a new version to the Google Play"
+  lane :deploy do
+    # Build the App Bundle
+    gradle(task: "bundleRelease")
+    
+    upload_to_play_store(
+      track: "internal",
+      aab: "app/build/outputs/bundle/release/app-release.aab"
+    )
+  end
+end

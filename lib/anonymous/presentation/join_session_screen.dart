@@ -195,10 +195,12 @@ class _JoinSessionScreenState extends ConsumerState<JoinSessionScreen> {
 
       if (result.isSuccess) {
         final (session, localState) = result.valueOrNull!;
-        
+
         // Save session to secure storage
         final storage = ref.read(anonymousSessionStorageProvider);
         await storage.saveSession(localState);
+
+        if (!mounted) return;
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(

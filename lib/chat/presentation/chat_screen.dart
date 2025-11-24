@@ -3,6 +3,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -11,6 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/result.dart';
+import '../../core/errors/app_error.dart';
 import '../models/message.dart';
 import '../models/message_reaction.dart';
 import '../services/conversation_service.dart';
@@ -29,12 +32,19 @@ import 'search_messages_screen.dart';
 import 'forward_message_screen.dart';
 import 'message_info_screen.dart';
 import '../../core/utils/text_direction_helper.dart';
+import '../../anonymous/models/anonymous_session.dart';
+import '../../anonymous/services/anonymous_session_service.dart';
+import '../../groups/presentation/group_settings_screen.dart';
+import '../../groups/services/group_service.dart';
+import '../../contacts/presentation/contact_info_screen.dart';
+import '../models/conversation.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
   final String conversationName;
   final bool isAnonymous;
   final DateTime? sessionExpiresAt;
+  final LocalSessionState? anonymousSessionState;
 
   const ChatScreen({
     super.key,
@@ -42,6 +52,7 @@ class ChatScreen extends ConsumerStatefulWidget {
     required this.conversationName,
     this.isAnonymous = false,
     this.sessionExpiresAt,
+    this.anonymousSessionState,
   });
 
   @override
@@ -52,6 +63,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final _focusNode = FocusNode(); // Add FocusNode
+  StreamSubscription? _messageSubscription;
 
   List<DecryptedMessage> _messages = [];
   Uint8List? _conversationKey;
@@ -65,12 +77,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   DecryptedMessage? _replyingTo; // Message being replied to
   ui.TextDirection _inputTextDirection =
       ui.TextDirection.ltr; // Track input field text direction
+  Conversation? _conversation;
 
   @override
   void initState() {
     super.initState();
     _loadConversation();
     _subscribeToTyping();
+    _subscribeToMessages();
     _scrollController.addListener(_onScroll);
   }
 
@@ -83,6 +97,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _markLastVisibleAsRead(String messageId) async {
+    if (widget.isAnonymous) return;
     final messageService = ref.read(messageServiceProvider);
     await messageService.markAsRead(
       conversationId: widget.conversationId,
@@ -91,6 +106,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _subscribeToTyping() {
+    if (widget.isAnonymous) return;
     final typingService = ref.read(typingServiceProvider);
     typingService.subscribeToTyping(widget.conversationId).listen((userIds) {
       if (mounted) {
@@ -103,15 +119,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _onTextChanged(String text) {
-    final typingService = ref.read(typingServiceProvider);
-    if (text.isNotEmpty && !_isTyping) {
-      _isTyping = true;
-      typingService.startTyping(widget.conversationId);
-    } else if (text.isEmpty && _isTyping) {
-      _isTyping = false;
-      typingService.stopTyping(widget.conversationId);
-    }
-
     // Update text direction based on content
     final newDirection = startsWithArabic(text)
         ? ui.TextDirection.rtl
@@ -121,10 +128,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _inputTextDirection = newDirection;
       });
     }
+
+    if (widget.isAnonymous) return;
+
+    final typingService = ref.read(typingServiceProvider);
+    if (text.isNotEmpty && !_isTyping) {
+      _isTyping = true;
+      typingService.startTyping(widget.conversationId);
+    } else if (text.isEmpty && _isTyping) {
+      _isTyping = false;
+      typingService.stopTyping(widget.conversationId);
+    }
   }
 
   @override
   void dispose() {
+    _messageSubscription?.cancel();
     if (_isTyping) {
       final typingService = ref.read(typingServiceProvider);
       typingService.stopTyping(widget.conversationId);
@@ -138,6 +157,45 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _loadConversation() async {
     final conversationService = ref.read(conversationServiceProvider);
     final messageService = ref.read(messageServiceProvider);
+
+    if (widget.isAnonymous && widget.anonymousSessionState != null) {
+      // For anonymous sessions, we already have the key
+      _conversationKey = base64Url.decode(
+        widget.anonymousSessionState!.masterSymKey,
+      );
+
+      // Load messages using AnonymousSessionService
+      final anonymousService = ref.read(anonymousSessionServiceProvider);
+      final messagesResult = await anonymousService.fetchMessages(
+        localState: widget.anonymousSessionState!,
+        limit: _messagesPerPage,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (messagesResult.isSuccess) {
+            final newMessages = messagesResult.valueOrNull ?? [];
+            _messages = newMessages;
+            _hasMoreMessages = newMessages.length == _messagesPerPage;
+          }
+        });
+
+        // Scroll to bottom
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+
+      _subscribeToMessages();
+      return;
+    }
 
     // Get conversation with key
     final convResult = await conversationService.getConversation(
@@ -155,6 +213,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final convWithKey = convResult.valueOrNull!;
     _conversationKey = convWithKey.key;
+    _conversation = convWithKey.conversation;
 
     // Load messages
     final messagesResult = await messageService.fetchMessages(
@@ -186,10 +245,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           );
         }
       });
+
+      _subscribeToMessages();
     }
   }
 
   Future<void> _loadReadStatus() async {
+    if (widget.isAnonymous) return;
     final messageService = ref.read(messageServiceProvider);
     final result = await messageService.getReadStatus(
       conversationId: widget.conversationId,
@@ -212,12 +274,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // Get oldest message timestamp for pagination
     final oldestMessage = _messages.first;
 
-    final messagesResult = await messageService.fetchMessages(
-      conversationId: widget.conversationId,
-      conversationKey: _conversationKey!,
-      limit: _messagesPerPage,
-      before: oldestMessage.createdAt,
-    );
+    Result<List<DecryptedMessage>, AppError> messagesResult;
+
+    if (widget.isAnonymous && widget.anonymousSessionState != null) {
+      final anonymousService = ref.read(anonymousSessionServiceProvider);
+      messagesResult = await anonymousService.fetchMessages(
+        localState: widget.anonymousSessionState!,
+        limit: _messagesPerPage,
+        before: oldestMessage.createdAt,
+      );
+    } else {
+      messagesResult = await messageService.fetchMessages(
+        conversationId: widget.conversationId,
+        conversationKey: _conversationKey!,
+        limit: _messagesPerPage,
+        before: oldestMessage.createdAt,
+      );
+    }
 
     if (mounted && messagesResult.isSuccess) {
       setState(() {
@@ -243,12 +316,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     final messageService = ref.read(messageServiceProvider);
-    final result = await messageService.sendMessage(
-      conversationId: widget.conversationId,
-      content: content,
-      conversationKey: _conversationKey!,
-      replyToId: replyToId,
-    );
+
+    Result<Message, AppError> result;
+
+    if (widget.isAnonymous && widget.anonymousSessionState != null) {
+      final anonymousService = ref.read(anonymousSessionServiceProvider);
+      result = await anonymousService.sendMessage(
+        content: content,
+        localState: widget.anonymousSessionState!,
+        replyToId: replyToId,
+      );
+    } else {
+      result = await messageService.sendMessage(
+        conversationId: widget.conversationId,
+        content: content,
+        conversationKey: _conversationKey!,
+        replyToId: replyToId,
+      );
+    }
 
     setState(() => _isSending = false);
 
@@ -285,6 +370,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final uploadResult = await mediaService.encryptAndUpload(
       file: File(filePath),
       conversationId: widget.conversationId,
+      conversationKey: _conversationKey!,
     );
 
     if (uploadResult.isFailure) {
@@ -320,6 +406,48 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ).showSnackBar(SnackBar(content: Text('Failed to send message')));
       }
     }
+  }
+
+  void _subscribeToMessages() {
+    _messageSubscription?.cancel();
+    if (_conversationKey == null) return;
+
+    Stream<DecryptedMessage> stream;
+
+    if (widget.isAnonymous && widget.anonymousSessionState != null) {
+      final anonymousService = ref.read(anonymousSessionServiceProvider);
+      stream = anonymousService.subscribeToMessages(
+        localState: widget.anonymousSessionState!,
+      );
+    } else {
+      final messageService = ref.read(messageServiceProvider);
+      stream = messageService.subscribeToMessages(
+        conversationId: widget.conversationId,
+        conversationKey: _conversationKey!,
+      );
+    }
+
+    _messageSubscription = stream.listen((message) {
+      if (mounted) {
+        final index = _messages.indexWhere((m) => m.id == message.id);
+        if (index != -1) {
+          // Update existing message (e.g. read status, deletion)
+          setState(() {
+            _messages[index] = message;
+          });
+        } else {
+          // Add new message
+          setState(() {
+            _messages.insert(0, message);
+          });
+
+          // Mark as read if visible
+          if (_scrollController.hasClients && _scrollController.offset < 100) {
+            _markLastVisibleAsRead(message.id);
+          }
+        }
+      }
+    });
   }
 
   @override
@@ -373,11 +501,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               }
             },
           ),
-          IconButton(
-            icon: Icon(Icons.more_vert),
-            onPressed: () {
-              // TODO: Show conversation settings
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'info') {
+                if (_conversation?.type == ConversationType.group) {
+                  // Fetch full group details
+                  // For now, we assume we can pass basic info or fetch in screen
+                  // But GroupSettingsScreen expects a Group object.
+                  // We need to fetch the Group object first.
+                  _navigateToGroupSettings();
+                } else if (_conversation?.type == ConversationType.direct) {
+                  // Navigate to contact info
+                  // We need the other user's ID.
+                  // In direct chat, we can infer it from members if we had them.
+                  // Or we can pass it.
+                  // For now, let's try to find the other member.
+                  _navigateToContactInfo();
+                }
+              }
             },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'info', child: Text('View Info')),
+              // Add more options here
+            ],
           ),
         ],
       ),
@@ -549,14 +695,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                       );
                                     },
                                     onDelete: () {
-                                      // TODO: Implement message deletion
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Delete - Coming soon'),
-                                        ),
-                                      );
+                                      _deleteMessage(message.id);
                                     },
                                   );
                                 },
@@ -770,6 +909,148 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
     );
   }
+
+  Future<void> _deleteMessage(String messageId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Message'),
+        content: const Text('Are you sure you want to delete this message?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final messageService = ref.read(messageServiceProvider);
+      final result = await messageService.deleteMessage(messageId);
+
+      if (result.isSuccess) {
+        // Update local state immediately
+        setState(() {
+          final index = _messages.indexWhere((m) => m.id == messageId);
+          if (index != -1) {
+            final oldMsg = _messages[index];
+            final newMsg = DecryptedMessage(
+              encrypted: oldMsg.encrypted.copyWith(deletedAt: DateTime.now()),
+              content: oldMsg.content,
+              senderName: oldMsg.senderName,
+              senderAvatar: oldMsg.senderAvatar,
+            );
+            _messages[index] = newMsg;
+          }
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to delete message: ${result.errorOrNull?.message}',
+              ),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _navigateToGroupSettings() async {
+    if (_conversation == null) return;
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final groupService = ref.read(
+      groupServiceProvider,
+    ); // Need to import group_service.dart
+    final result = await groupService.getGroup(_conversation!.id);
+
+    if (!mounted) return;
+    Navigator.of(context).pop(); // Close loading
+
+    if (result.isSuccess) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => GroupSettingsScreen(group: result.valueOrNull!),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to load group info: ${result.errorOrNull?.message}',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _navigateToContactInfo() async {
+    if (_conversation == null) return;
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final conversationService = ref.read(conversationServiceProvider);
+    final membersResult = await conversationService.getConversationMembers(
+      _conversation!.id,
+    );
+
+    if (!mounted) return;
+    Navigator.of(context).pop(); // Close loading
+
+    if (membersResult.isSuccess) {
+      final members = membersResult.valueOrNull!;
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+
+      try {
+        final otherMember = members.firstWhere((m) => m.id != currentUserId);
+
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => ContactInfoScreen(
+                userId: otherMember.id,
+                displayName: otherMember.displayName ?? otherMember.username,
+                conversationId: _conversation!.id,
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not find other user info')),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to load contact info: ${membersResult.errorOrNull?.message}',
+          ),
+        ),
+      );
+    }
+  }
 }
 
 class _MessageBubble extends ConsumerStatefulWidget {
@@ -904,9 +1185,26 @@ class _MessageBubbleState extends ConsumerState<_MessageBubble> {
     DecryptedMessage message,
     bool isMe,
   ) {
+    // Check if deleted
+    if (message.encrypted.deletedAt != null) {
+      return Text(
+        '🚫 This message was deleted',
+        style: TextStyle(
+          fontStyle: FontStyle.italic,
+          color: isMe
+              ? Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)
+              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+      );
+    }
+
     // Check if this is a media message
     if (message.type != MessageType.text && message.metadata != null) {
-      return MediaMessageBubble(message: message, isMe: isMe);
+      return MediaMessageBubble(
+        message: message,
+        isMe: isMe,
+        conversationKey: widget.conversationKey,
+      );
     }
 
     // Default text message

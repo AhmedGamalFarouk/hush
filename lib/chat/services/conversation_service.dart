@@ -3,7 +3,7 @@
 library;
 
 import 'dart:convert';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -11,7 +11,9 @@ import '../../core/errors/app_error.dart';
 import '../../core/supabase/supabase_provider.dart';
 import '../../core/utils/result.dart';
 import '../../encryption/providers/encryption_provider.dart';
+import '../../encryption/providers/secure_key_storage_provider.dart';
 import '../../encryption/services/encryption_service.dart';
+import '../../encryption/services/secure_key_storage.dart';
 import '../models/conversation.dart';
 import '../models/profile.dart';
 
@@ -19,6 +21,7 @@ final conversationServiceProvider = Provider<ConversationService>((ref) {
   return ConversationService(
     supabase: ref.watch(supabaseProvider),
     encryptionService: ref.watch(encryptionServiceProvider),
+    secureKeyStorage: ref.watch(secureKeyStorageProvider),
   );
 });
 
@@ -26,12 +29,15 @@ class ConversationService {
   final SupabaseClient _supabase;
   static const _uuid = Uuid();
   final EncryptionService _encryptionService;
+  final SecureKeyStorage _secureKeyStorage;
 
   ConversationService({
     required SupabaseClient supabase,
     required EncryptionService encryptionService,
+    required SecureKeyStorage secureKeyStorage,
   }) : _supabase = supabase,
-       _encryptionService = encryptionService;
+       _encryptionService = encryptionService,
+       _secureKeyStorage = secureKeyStorage;
 
   // ===========================================================================
   // CREATE DIRECT CONVERSATION
@@ -100,11 +106,55 @@ class ConversationService {
       }
       final conversationKey = keyResult.valueOrNull!;
 
-      // TODO: Encrypt conversation key with each user's public key
-      // For now, using a simplified approach - store base64 encoded
-      // In production: use box_seal to encrypt with public key
-      final encryptedKeyForMe = base64Url.encode(conversationKey);
-      final encryptedKeyForOther = base64Url.encode(conversationKey);
+      // CRITICAL SECURITY FIX: Properly encrypt conversation key with each user's public key
+      // Get my keys to encrypt for myself
+      final myKeysResult = await _secureKeyStorage.getPublicKeys();
+      if (myKeysResult.isFailure) {
+        return Result.failure(myKeysResult.errorOrNull!);
+      }
+      final myPublicKey = myKeysResult.valueOrNull!.kxPublicKey;
+
+      // Get other user's public key
+      final otherUserProfile = await _supabase
+          .from('profiles')
+          .select('public_key')
+          .eq('id', otherUserId)
+          .single();
+
+      if (otherUserProfile['public_key'] == null) {
+        return Result.failure(
+          AppError.encryption(message: 'Other user has no public key'),
+        );
+      }
+
+      final otherUserPublicKey = base64Url.decode(
+        otherUserProfile['public_key'] as String,
+      );
+
+      // Encrypt conversation key for me using sealed box
+      final encryptForMeResult = await _encryptionService.sealBox(
+        plaintext: conversationKey,
+        recipientPublicKey: myPublicKey,
+      );
+      if (encryptForMeResult.isFailure) {
+        return Result.failure(encryptForMeResult.errorOrNull!);
+      }
+
+      // Encrypt conversation key for other user using sealed box
+      final encryptForOtherResult = await _encryptionService.sealBox(
+        plaintext: conversationKey,
+        recipientPublicKey: otherUserPublicKey,
+      );
+      if (encryptForOtherResult.isFailure) {
+        return Result.failure(encryptForOtherResult.errorOrNull!);
+      }
+
+      final encryptedKeyForMe = base64Url.encode(
+        encryptForMeResult.valueOrNull!,
+      );
+      final encryptedKeyForOther = base64Url.encode(
+        encryptForOtherResult.valueOrNull!,
+      );
 
       // Create conversation
       final conversationId = _uuid.v4();
@@ -117,9 +167,9 @@ class ConversationService {
           'created_at': now.toIso8601String(),
           'updated_at': now.toIso8601String(),
         });
-        print('Created conversation: $conversationId');
+        debugPrint('Created conversation: $conversationId');
       } catch (e) {
-        print('Error creating conversation: $e');
+        debugPrint('Error creating conversation: $e');
         rethrow;
       }
 
@@ -133,9 +183,9 @@ class ConversationService {
           'role': 'member',
           'joined_at': now.toIso8601String(),
         });
-        print('Added current user to conversation: ${currentUser.id}');
+        debugPrint('Added current user to conversation: ${currentUser.id}');
       } catch (e) {
-        print('Error adding current user to conversation: $e');
+        debugPrint('Error adding current user to conversation: $e');
         rethrow;
       }
 
@@ -149,9 +199,9 @@ class ConversationService {
           'role': 'member',
           'joined_at': now.toIso8601String(),
         });
-        print('Added other user to conversation: $otherUserId');
+        debugPrint('Added other user to conversation: $otherUserId');
       } catch (e) {
-        print('Error adding other user to conversation: $e');
+        debugPrint('Error adding other user to conversation: $e');
         rethrow;
       }
 
@@ -228,31 +278,51 @@ class ConversationService {
             try {
               final encryptedKey = keyMap[conversation.id];
               if (encryptedKey != null) {
-                // Decrypt conversation key
-                // TODO: This should be decrypted with user's private key.
-                // But current implementation stores it base64 encoded (simplified).
-                final conversationKey = base64Url.decode(encryptedKey);
-
-                final encryptedPreviewJson = jsonDecode(
-                  conversation.lastMessagePreview!,
-                );
-                final encryptedPreview = EncryptedMessage.fromJson(
-                  encryptedPreviewJson,
+                // CRITICAL SECURITY FIX: Decrypt conversation key with user's private key
+                final myKeysResult = await _secureKeyStorage.retrieveKeyPairs(
+                  password:
+                      '', // Password should be cached in memory from login
                 );
 
-                final decryptResult = await _encryptionService.decryptMessage(
-                  encrypted: encryptedPreview,
-                  key: Uint8List.fromList(conversationKey),
-                );
+                if (myKeysResult.isSuccess) {
+                  final myKeys = myKeysResult.valueOrNull!;
 
-                if (decryptResult.isSuccess) {
-                  conversation = conversation.copyWith(
-                    lastMessagePreview: decryptResult.valueOrNull,
-                  );
+                  // Decrypt the conversation key using sealed box
+                  final decryptKeyResult = await _encryptionService
+                      .openSealedBox(
+                        ciphertext: base64Url.decode(encryptedKey),
+                        myPublicKey: myKeys.kxKeyPair.publicKey,
+                        mySecretKey: myKeys.kxKeyPair.secretKey,
+                      );
+
+                  if (decryptKeyResult.isSuccess) {
+                    final conversationKey = decryptKeyResult.valueOrNull!;
+
+                    final encryptedPreviewJson = jsonDecode(
+                      conversation.lastMessagePreview!,
+                    );
+                    final encryptedPreview = EncryptedMessage.fromJson(
+                      encryptedPreviewJson,
+                    );
+
+                    final decryptResult = await _encryptionService
+                        .decryptMessage(
+                          encrypted: encryptedPreview,
+                          key: Uint8List.fromList(conversationKey),
+                        );
+
+                    if (decryptResult.isSuccess) {
+                      conversation = conversation.copyWith(
+                        lastMessagePreview: decryptResult.valueOrNull,
+                      );
+                    }
+                  }
                 }
               }
             } catch (e) {
-              print('Failed to decrypt preview for ${conversation.id}: $e');
+              debugPrint(
+                'Failed to decrypt preview for ${conversation.id}: $e',
+              );
               // Keep encrypted or set to "Encrypted message"
               conversation = conversation.copyWith(
                 lastMessagePreview: 'Encrypted message',
@@ -352,10 +422,34 @@ class ConversationService {
           .eq('user_id', currentUser.id)
           .single();
 
-      // TODO: Decrypt the key with user's secret key
-      // For now, using simplified approach
+      // CRITICAL SECURITY FIX: Decrypt the key with user's secret key
       final encryptedKey = memberData['encrypted_conversation_key'] as String;
-      final conversationKey = base64Url.decode(encryptedKey);
+
+      // Get user's keys
+      final myKeysResult = await _secureKeyStorage.retrieveKeyPairs(
+        password: '', // Should be cached from login
+      );
+
+      if (myKeysResult.isFailure) {
+        return Result.failure(
+          AppError.encryption(message: 'Failed to retrieve user keys'),
+        );
+      }
+
+      final myKeys = myKeysResult.valueOrNull!;
+
+      // Decrypt conversation key using sealed box
+      final decryptKeyResult = await _encryptionService.openSealedBox(
+        ciphertext: base64Url.decode(encryptedKey),
+        myPublicKey: myKeys.kxKeyPair.publicKey,
+        mySecretKey: myKeys.kxKeyPair.secretKey,
+      );
+
+      if (decryptKeyResult.isFailure) {
+        return Result.failure(decryptKeyResult.errorOrNull!);
+      }
+
+      final conversationKey = decryptKeyResult.valueOrNull!;
 
       return Result.success(
         ConversationWithKey(

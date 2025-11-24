@@ -311,6 +311,7 @@ class _SessionLobbyScreenState extends ConsumerState<SessionLobbyScreen> {
           conversationName: 'Anonymous Session',
           isAnonymous: true,
           sessionExpiresAt: widget.session.expiresAt,
+          anonymousSessionState: widget.localState,
         ),
       ),
     );

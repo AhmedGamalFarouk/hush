@@ -1,0 +1,2 @@
+json_key_file("fastlane/pc-api-key.json") # Path to the json secret file - Follow instructions in README to get this
+package_name("com.caffeinecode.hush") # e.g. com.krausefx.app

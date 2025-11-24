@@ -3,19 +3,23 @@
 library;
 
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:open_filex/open_filex.dart';
 import '../../models/message.dart';
 import '../../../media/services/media_service.dart';
 
 class MediaMessageBubble extends ConsumerStatefulWidget {
   final DecryptedMessage message;
   final bool isMe;
+  final Uint8List conversationKey;
 
   const MediaMessageBubble({
     super.key,
     required this.message,
     required this.isMe,
+    required this.conversationKey,
   });
 
   @override
@@ -54,6 +58,7 @@ class _MediaMessageBubbleState extends ConsumerState<MediaMessageBubble> {
       // Download and decrypt
       final result = await mediaService.downloadAndDecrypt(
         media: encryptedMedia,
+        conversationKey: widget.conversationKey,
       );
 
       if (mounted) {
@@ -84,6 +89,11 @@ class _MediaMessageBubbleState extends ConsumerState<MediaMessageBubble> {
 
   void _viewFullScreen() {
     if (_cachedFile == null) return;
+
+    if (widget.message.type == MessageType.file) {
+      OpenFilex.open(_cachedFile!.path);
+      return;
+    }
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -337,7 +347,7 @@ class _FullScreenMediaViewer extends StatelessWidget {
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () {
-              // TODO: Open with system default app
+              OpenFilex.open(file.path);
             },
             icon: const Icon(Icons.open_in_new),
             label: const Text('Open with...'),

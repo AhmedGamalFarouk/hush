@@ -4,9 +4,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
 import '../models/group.dart';
 import '../services/group_service.dart';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'add_member_screen.dart';
 
 class GroupSettingsScreen extends ConsumerStatefulWidget {
   final Group group;
@@ -30,10 +34,12 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
   }
 
   void _checkIfAdmin() {
-    // TODO: Get current user ID from auth
-    // _isCurrentUserAdmin = _group.members
-    //     .any((m) => m.userId == currentUserId && m.isAdmin);
-    _isCurrentUserAdmin = true; // Temporary
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId != null) {
+      _isCurrentUserAdmin = _group.members.any(
+        (m) => m.userId == currentUserId && m.isAdmin,
+      );
+    }
   }
 
   @override
@@ -153,7 +159,12 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
             final member = _group.members[index];
             return ListTile(
               leading: CircleAvatar(
-                child: Text(member.displayName.substring(0, 1).toUpperCase()),
+                backgroundImage: member.avatarUrl != null
+                    ? CachedNetworkImageProvider(member.avatarUrl!)
+                    : null,
+                child: member.avatarUrl == null
+                    ? Text(member.displayName.substring(0, 1).toUpperCase())
+                    : null,
               ),
               title: Text(member.displayName),
               subtitle: Text(
@@ -241,37 +252,90 @@ class _GroupSettingsScreenState extends ConsumerState<GroupSettingsScreen> {
   }
 
   void _editGroupInfo() {
-    // TODO: Show dialog to edit name/description
+    final nameController = TextEditingController(text: _group.name);
+    final descriptionController = TextEditingController(
+      text: _group.description ?? '',
+    );
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Edit Group'),
-        content: const Text('Coming soon...'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Group Name',
+                hintText: 'Enter group name',
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacing16),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                hintText: 'Enter group description',
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (nameController.text.trim().isEmpty) return;
+
+              Navigator.pop(dialogContext);
+
+              final groupService = ref.read(groupServiceProvider);
+              final result = await groupService.updateGroup(
+                groupId: _group.id,
+                name: nameController.text.trim(),
+                description: descriptionController.text.trim().isEmpty
+                    ? null
+                    : descriptionController.text.trim(),
+              );
+
+              if (mounted) {
+                if (result.isSuccess) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Group info updated')),
+                  );
+                  _refreshGroup();
+                } else {
+                  _showError(result.errorOrNull!.message);
+                }
+              }
+            },
+            child: const Text('Save'),
           ),
         ],
       ),
     );
   }
 
-  void _addMember() {
-    // TODO: Show member picker dialog
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Member'),
-        content: const Text('Coming soon...'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
+  Future<void> _addMember() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => AddMemberScreen(
+          groupId: _group.id,
+          existingMemberIds: _group.members.map((m) => m.userId).toList(),
+        ),
       ),
     );
+
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Member added successfully')),
+      );
+      _refreshGroup();
+    }
   }
 
   Future<void> _removeMember(String userId) async {

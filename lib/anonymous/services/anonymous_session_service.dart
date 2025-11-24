@@ -44,6 +44,7 @@ import '../../core/utils/result.dart';
 import '../../encryption/providers/encryption_provider.dart';
 import '../../encryption/services/encryption_service.dart';
 import '../models/anonymous_session.dart';
+import '../../chat/models/message.dart';
 
 /// Provider for anonymous session service
 final anonymousSessionServiceProvider = Provider<AnonymousSessionService>((
@@ -114,7 +115,15 @@ class AnonymousSessionService {
       final now = DateTime.now();
       final expiresAt = now.add(params.expiry);
 
-      // Note: Sensitive fields are NOT stored on server
+      // First create the conversation record
+      await _supabase.from('conversations').insert({
+        'id': sessionId,
+        'type': 'anonymous',
+        'created_at': now.toIso8601String(),
+        'is_active': true,
+      });
+
+      // Then create anonymous session metadata
       final sessionData = {
         'session_id': sessionId,
         'created_at': now.toIso8601String(),
@@ -274,7 +283,8 @@ class AnonymousSessionService {
       return Result.success((session, localState));
     } catch (e) {
       return Result.failure(
-        AppError.unknown(message: 'Failed to join session: $e'),
+        AppError.unknown(message: 'Failed to join session: $e',
+        ),
       );
     }
   }
@@ -395,6 +405,124 @@ class AnonymousSessionService {
     } catch (e) {
       return Result.failure(
         AppError.decryption(message: 'Failed to decrypt message'),
+      );
+    }
+  }
+
+  // ============================================================================
+  // MESSAGING
+  // ============================================================================
+
+  /// Send a message in an anonymous session
+  Future<Result<Message, AppError>> sendMessage({
+    required String content,
+    required LocalSessionState localState,
+    MessageType type = MessageType.text,
+    String? replyToId,
+  }) async {
+    try {
+      // Encrypt message
+      final encryptResult = await encryptSessionMessage(
+        plaintext: content,
+        localState: localState,
+      );
+
+      if (encryptResult.isFailure) {
+        return Result.failure(encryptResult.errorOrNull!);
+      }
+
+      final payload = encryptResult.valueOrNull!;
+      
+      // Add other fields
+      payload['type'] = type.name;
+      if (replyToId != null) {
+        payload['reply_to_id'] = replyToId;
+      }
+
+      // Insert to Supabase
+      final response = await _supabase
+          .from('messages')
+          .insert(payload)
+          .select()
+          .single();
+
+      final message = Message.fromJson(response);
+      return Result.success(message);
+    } catch (e) {
+      return Result.failure(
+        AppError.unknown(message: 'Failed to send anonymous message: $e'),
+      );
+    }
+  }
+
+  /// Fetch messages for an anonymous session
+  Future<Result<List<DecryptedMessage>, AppError>> fetchMessages({
+    required LocalSessionState localState,
+    int limit = 50,
+    DateTime? before,
+  }) async {
+    try {
+      PostgrestFilterBuilder query = _supabase
+          .from('messages')
+          .select()
+          .eq('conversation_id', localState.sessionId);
+
+      if (before != null) {
+        query = query.lt('created_at', before.toIso8601String());
+      }
+
+      final response = await query
+          .order('created_at', ascending: false)
+          .limit(limit);
+
+      final messages = (response as List)
+          .map((json) => Message.fromJson(json as Map<String, dynamic>))
+          .toList();
+
+      final decryptedMessages = <DecryptedMessage>[];
+      for (final message in messages) {
+        // Prepare message data for decryption
+        final messageData = {
+          'ciphertext': message.ciphertext,
+          'nonce': message.nonce,
+          'sender_blob': jsonEncode(message.senderBlob),
+        };
+
+        final decryptResult = await decryptSessionMessage(
+          messageData: messageData,
+          localState: localState,
+        );
+
+        if (decryptResult.isSuccess) {
+          // Parse sender info from blob
+          String senderName = 'Anonymous';
+          if (message.senderBlob != null) {
+            try {
+              final blob = jsonDecode(message.senderBlob!) as Map<String, dynamic>;
+              if (blob['nickname'] != null) {
+                senderName = blob['nickname'] as String;
+              } else if (blob['ephemeral_id'] != null) {
+                senderName = 'User ${(blob['ephemeral_id'] as String).substring(0, 6)}';
+              }
+            } catch (_) {
+              // Ignore parsing errors
+            }
+          }
+
+          decryptedMessages.add(
+            DecryptedMessage(
+              encrypted: message,
+              content: decryptResult.valueOrNull!,
+              senderName: senderName,
+            ),
+          );
+        }
+      }
+
+      return Result.success(decryptedMessages.reversed.toList());
+    } catch (e) {
+      return Result.failure(
+        AppError.unknown(message: 'Failed to fetch anonymous messages: $e'),
       );
     }
   }
@@ -544,5 +672,56 @@ class AnonymousSessionService {
       'expires_at': session.expiresAt.toIso8601String(),
       'human_code': session.humanCode,
     });
+  }
+
+  /// Subscribe to new messages in an anonymous session
+  Stream<DecryptedMessage> subscribeToMessages({
+    required LocalSessionState localState,
+  }) {
+    return _supabase
+        .from('messages:conversation_id=eq.${localState.sessionId}')
+        .stream(primaryKey: ['id'])
+        .asyncMap((records) async {
+          if (records.isEmpty) return null;
+
+          final messageJson = records.last;
+          final message = Message.fromJson(messageJson);
+
+          // Prepare message data for decryption
+          final messageData = {
+            'ciphertext': message.ciphertext,
+            'nonce': message.nonce,
+            'sender_blob': jsonEncode(message.senderBlob),
+          };
+
+          final decryptResult = await decryptSessionMessage(
+            messageData: messageData,
+            localState: localState,
+          );
+
+          if (decryptResult.isSuccess) {
+            // Parse sender info from blob
+            String senderName = 'Anonymous';
+            if (message.senderBlob != null) {
+              try {
+                final blob = jsonDecode(message.senderBlob!) as Map<String, dynamic>;
+                if (blob['nickname'] != null) {
+                  senderName = blob['nickname'] as String;
+                } else if (blob['ephemeral_id'] != null) {
+                  senderName = 'User ${(blob['ephemeral_id'] as String).substring(0, 6)}';
+                }
+              } catch (_) {}
+            }
+
+            return DecryptedMessage(
+              encrypted: message,
+              content: decryptResult.valueOrNull!,
+              senderName: senderName,
+            );
+          }
+          return null;
+        })
+        .where((message) => message != null)
+        .cast<DecryptedMessage>();
   }
 }
